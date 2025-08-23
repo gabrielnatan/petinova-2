@@ -9,6 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useThemeStyles } from "@/components/theme-provider";
 import { useAuth } from "@/store";
+import { AuthRedirect } from "@/components/auth-redirect";
 import Link from "next/link";
 
 const loginSchema = z.object({
@@ -37,38 +38,30 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
 
-      // Mock successful login
-      const mockUser = {
-        user_id: "1",
-        name: "Dr. João Silva",
-        email: data.email,
-        role: "veterinarian",
-        active: true,
-        clinic_id: "1",
-        created_at: new Date(),
-      };
+      const result = await response.json();
 
-      const mockClinic = {
-        clinic_id: "1",
-        legalName: "Clínica Veterinária São Bento LTDA",
-        tradeName: "Clínica São Bento",
-        cnpj: "12.345.678/0001-90",
-        email: "contato@clinicasaobento.com.br",
-        address: "Rua das Flores, 123 - Centro",
-        isActive: true,
-        created_at: new Date(),
-      };
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao fazer login');
+      }
 
-      login(mockUser, mockClinic);
+      // Login with returned data
+      login(result.user, result.clinic);
 
       // Redirect to dashboard
       window.location.href = "/dashboard";
     } catch (error) {
-      console.log(error)
-      setError("email", { message: "Credenciais inválidas" });
+      console.error("Login error:", error);
+      setError("email", { 
+        message: error instanceof Error ? error.message : "Credenciais inválidas" 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -78,7 +71,8 @@ export default function LoginPage() {
   //   subtitle="Acesse sua conta para gerenciar sua clínica"
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <AuthRedirect>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Email Field */}
       <div>
         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -192,5 +186,6 @@ export default function LoginPage() {
         </p>
       </div>
     </form>
+    </AuthRedirect>
   );
 }

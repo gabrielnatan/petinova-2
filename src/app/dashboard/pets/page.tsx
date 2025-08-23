@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -14,52 +14,45 @@ import {
   Edit,
   Eye,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 
-// Mock data - replace with real data
-const mockPets = [
-  {
-    pet_id: "1",
-    name: "Buddy",
-    species: "Cão",
-    breed: "Golden Retriever",
-    size: "Grande",
-    weight: 30,
-    isNeutered: true,
-    environment: "Casa",
-    birthDate: new Date("2020-03-15"),
-    avatarUrl: null,
-    guardian: { fullName: "João Silva", phone: "(11) 99999-9999" },
-    guardian_id: "1",
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-  {
-    pet_id: "2",
-    name: "Luna",
-    species: "Gato",
-    breed: "Siamês",
-    size: "Pequeno",
-    weight: 4,
-    isNeutered: false,
-    environment: "Apartamento",
-    birthDate: new Date("2021-07-22"),
-    avatarUrl: null,
-    guardian: { fullName: "Maria Santos", phone: "(11) 88888-8888" },
-    guardian_id: "2",
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-];
+interface Pet {
+  pet_id: string;
+  name: string;
+  species: string;
+  breed: string;
+  size: string;
+  weight: number;
+  isNeutered: boolean;
+  environment: string;
+  birthDate: string;
+  avatarUrl: string | null;
+  guardian: { name: string; phone: string };
+  guardian_id: string;
+  clinic_id: string;
+  createdAt: string;
+}
 
-function PetCard({ pet }: { pet: any }) {
+interface PetsResponse {
+  pets: Pet[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }) {
   const [showMenu, setShowMenu] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const getAgeText = (birthDate: Date) => {
+  const getAgeText = (birthDate: string) => {
     const today = new Date();
     const birth = new Date(birthDate);
     const diffTime = Math.abs(today.getTime() - birth.getTime());
@@ -71,6 +64,33 @@ function PetCard({ pet }: { pet: any }) {
       return `${years} ano${years > 1 ? "s" : ""}`;
     } else {
       return `${months} mes${months > 1 ? "es" : ""}`;
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Tem certeza que deseja excluir este pet?")) return;
+    
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch(`/api/pets/${pet.pet_id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        onDelete(pet.pet_id);
+        setShowMenu(false);
+      } else {
+        alert("Erro ao excluir pet");
+      }
+    } catch (error) {
+      console.error("Erro ao excluir pet:", error);
+      alert("Erro ao excluir pet");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -127,9 +147,17 @@ function PetCard({ pet }: { pet: any }) {
                     <Edit className="w-4 h-4 mr-2" />
                     Editar
                   </Link>
-                  <button className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
+                  <button 
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary disabled:opacity-50"
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    {isDeleting ? "Excluindo..." : "Excluir"}
                   </button>
                 </motion.div>
               )}
@@ -164,7 +192,7 @@ function PetCard({ pet }: { pet: any }) {
           <div className="border-t border-border pt-3">
             <div className="flex items-center space-x-2 text-sm text-text-secondary">
               <User className="w-4 h-4" />
-              <span>{pet.guardian.fullName}</span>
+              <span>{pet.guardian.name}</span>
             </div>
           </div>
         </CardContent>
@@ -175,17 +203,58 @@ function PetCard({ pet }: { pet: any }) {
 
 export default function PetsListPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ total: 0, dogs: 0, cats: 0 });
 
-  const displayPets = searchTerm
-    ? mockPets.filter(
-        (pet) =>
-          pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pet.breed.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          pet.guardian.fullName
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()),
-      )
-    : mockPets;
+  const fetchPets = async (search?: string) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("accessToken");
+      const url = `/api/pets${search ? `?search=${encodeURIComponent(search)}` : ""}`;
+      
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao carregar pets");
+      }
+
+      const data: PetsResponse = await response.json();
+      setPets(data.pets);
+      
+      // Calculate stats
+      const total = data.pets.length;
+      const dogs = data.pets.filter(pet => pet.species === "Cão").length;
+      const cats = data.pets.filter(pet => pet.species === "Gato").length;
+      setStats({ total, dogs, cats });
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPets();
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchPets(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const handleDeletePet = (petId: string) => {
+    setPets(prev => prev.filter(pet => pet.pet_id !== petId));
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -197,9 +266,9 @@ export default function PetsListPage() {
             Gerencie todos os pets da clínica
           </p>
         </div>
-        <Button>
-          <Link href="/dashboard/pets/new">
-            <Plus className="w-4 h-4 mr-2" />
+        <Button asChild>
+          <Link href="/dashboard/pets/new" className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
             Novo Pet
           </Link>
         </Button>
@@ -229,7 +298,7 @@ export default function PetsListPage() {
               <div>
                 <p className="text-sm text-text-secondary">Total de Pets</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockPets.length}
+                  {loading ? "--" : stats.total}
                 </p>
               </div>
               <Heart className="w-8 h-8 text-primary-500" />
@@ -243,7 +312,7 @@ export default function PetsListPage() {
               <div>
                 <p className="text-sm text-text-secondary">Cães</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockPets.filter((p) => p.species === "Cão").length}
+                  {loading ? "--" : stats.dogs}
                 </p>
               </div>
               <div className="w-8 h-8 bg-secondary-100 rounded-full flex items-center justify-center">
@@ -259,7 +328,7 @@ export default function PetsListPage() {
               <div>
                 <p className="text-sm text-text-secondary">Gatos</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockPets.filter((p) => p.species === "Gato").length}
+                  {loading ? "--" : stats.cats}
                 </p>
               </div>
               <div className="w-8 h-8 bg-accent-100 rounded-full flex items-center justify-center">
@@ -282,21 +351,69 @@ export default function PetsListPage() {
         </Card>
       </div>
 
-      {/* Pets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayPets.map((pet, index) => (
-          <motion.div
-            key={pet.pet_id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <PetCard pet={pet} />
-          </motion.div>
-        ))}
-      </div>
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <div className="w-12 h-12 bg-error/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Heart className="w-6 h-6 text-error" />
+          </div>
+          <h3 className="text-lg font-medium text-text-primary mb-2">
+            Erro ao carregar pets
+          </h3>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <Button onClick={() => fetchPets(searchTerm)}>
+            Tentar Novamente
+          </Button>
+        </div>
+      )}
 
-      {displayPets.length === 0 && (
+      {/* Loading State */}
+      {loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gray-200 rounded-full" />
+                    <div>
+                      <div className="h-4 bg-gray-200 rounded w-24 mb-2" />
+                      <div className="h-3 bg-gray-200 rounded w-16" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="flex justify-between">
+                      <div className="h-3 bg-gray-200 rounded w-16" />
+                      <div className="h-3 bg-gray-200 rounded w-12" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Pets Grid */}
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {pets.map((pet, index) => (
+            <motion.div
+              key={pet.pet_id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <PetCard pet={pet} onDelete={handleDeletePet} />
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && pets.length === 0 && (
         <div className="text-center py-12">
           <Heart className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
@@ -307,9 +424,9 @@ export default function PetsListPage() {
               ? "Tente ajustar sua busca"
               : "Comece cadastrando o primeiro pet"}
           </p>
-          <Button>
-            <Link href="/dashboard/pets/new">
-              <Plus className="w-4 h-4 mr-2" />
+          <Button asChild>
+            <Link href="/dashboard/pets/new" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
               Cadastrar Pet
             </Link>
           </Button>

@@ -385,6 +385,10 @@ export default function SecuritySettingsPage() {
                   </button>
                 </div>
 
+                {errors.submit && (
+                  <p className="text-sm text-error">{errors.submit}</p>
+                )}
+
                 <Button
                   onClick={handlePasswordSubmit}
                   loading={isSubmitting}
@@ -463,7 +467,7 @@ export default function SecuritySettingsPage() {
                 <div className="flex items-center space-x-3">
                   <div
                     className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      mockUser.twoFactorEnabled
+                      userSecurity.twoFactorEnabled
                         ? "bg-success text-text-inverse"
                         : "bg-background-tertiary"
                     }`}
@@ -475,19 +479,19 @@ export default function SecuritySettingsPage() {
                       Autenticação por Aplicativo
                     </h3>
                     <p className="text-sm text-text-secondary">
-                      {mockUser.twoFactorEnabled ? "Ativo" : "Inativo"}
+                      {userSecurity.twoFactorEnabled ? "Ativo" : "Inativo"}
                     </p>
                   </div>
                 </div>
                 <Button
-                  variant={mockUser.twoFactorEnabled ? "danger" : "primary"}
+                  variant={userSecurity.twoFactorEnabled ? "danger" : "primary"}
                   onClick={handle2FAToggle}
                 >
-                  {mockUser.twoFactorEnabled ? "Desabilitar" : "Habilitar"}
+                  {userSecurity.twoFactorEnabled ? "Desabilitar" : "Habilitar"}
                 </Button>
               </div>
 
-              {mockUser.twoFactorEnabled && (
+              {userSecurity.twoFactorEnabled && (
                 <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
                     <CheckCircle className="w-4 h-4 text-success" />

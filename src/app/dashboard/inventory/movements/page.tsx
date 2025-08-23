@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -20,6 +19,8 @@ import {
   Package2,
   ShoppingCart,
   Pill,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,118 +35,15 @@ import {
 } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { inventoryAPI, type StockMovement, type MovementStats } from "@/lib/api/inventory";
+import { useAuth } from "@/store";
 
-// Mock data
-const mockMovements = [
-  {
-    id: "1",
-    type: "IN",
-    product: {
-      name: "Ração Premium Cães Adultos",
-      type: "Alimento",
-      unit: "kg",
-    },
-    quantity: 50,
-    reason: "Compra - Fornecedor",
-    date: new Date("2025-01-28"),
-    user: "Admin Sistema",
-    reference: "NF-001234",
-    batch: "L2025001",
-    unitCost: 45.5,
-    created_at: new Date("2025-01-28"),
-  },
-  {
-    id: "2",
-    type: "OUT",
-    product: {
-      name: "Vacina V10 Canina",
-      type: "Medicamento",
-      unit: "dose",
-    },
-    quantity: 2,
-    reason: "Consulta Veterinária",
-    date: new Date("2025-01-27"),
-    user: "Dra. Maria Santos",
-    reference: "Consulta #123",
-    batch: "V2024512",
-    unitCost: 28.0,
-    created_at: new Date("2025-01-27"),
-  },
-  {
-    id: "3",
-    type: "OUT",
-    product: {
-      name: "Antibiótico Amoxicilina",
-      type: "Medicamento",
-      unit: "comprimido",
-    },
-    quantity: 5,
-    reason: "Prescrição Médica",
-    date: new Date("2025-01-26"),
-    user: "Dr. Carlos Lima",
-    reference: "Receita #456",
-    batch: "A2024890",
-    unitCost: 2.5,
-    created_at: new Date("2025-01-26"),
-  },
-  {
-    id: "4",
-    type: "IN",
-    product: {
-      name: "Shampoo Antipulgas",
-      type: "Higiene",
-      unit: "un",
-    },
-    quantity: 24,
-    reason: "Reposição de Estoque",
-    date: new Date("2025-01-25"),
-    user: "Admin Sistema",
-    reference: "NF-001235",
-    batch: "S2025002",
-    unitCost: 15.9,
-    created_at: new Date("2025-01-25"),
-  },
-  {
-    id: "5",
-    type: "OUT",
-    product: {
-      name: "Brinquedo Corda Dental",
-      type: "Acessório",
-      unit: "un",
-    },
-    quantity: 3,
-    reason: "Venda Balcão",
-    date: new Date("2025-01-24"),
-    user: "Recepção",
-    reference: "Venda #789",
-    batch: null,
-    unitCost: 8.5,
-    created_at: new Date("2025-01-24"),
-  },
-  {
-    id: "6",
-    type: "ADJUST",
-    product: {
-      name: "Ração Premium Gatos",
-      type: "Alimento",
-      unit: "kg",
-    },
-    quantity: -2,
-    reason: "Ajuste de Inventário",
-    date: new Date("2025-01-23"),
-    user: "Admin Sistema",
-    reference: "INV-2025001",
-    batch: "G2024789",
-    unitCost: 52.0,
-    created_at: new Date("2025-01-23"),
-  },
-];
 
 const movementTypes = [
   { value: "all", label: "Todos os tipos" },
   { value: "IN", label: "Entradas", icon: TrendingUp, color: "text-success" },
   { value: "OUT", label: "Saídas", icon: TrendingDown, color: "text-error" },
-  { value: "ADJUST", label: "Ajustes", icon: BarChart3, color: "text-warning" },
+  { value: "ADJUSTMENT", label: "Ajustes", icon: BarChart3, color: "text-warning" },
 ];
 
 const movementReasons = [
@@ -162,6 +60,18 @@ const movementReasons = [
 ];
 
 export default function StockMovementsPage() {
+  const { user } = useAuth();
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [stats, setStats] = useState<MovementStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0,
+  });
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterReason, setFilterReason] = useState<string>("all");
@@ -169,34 +79,82 @@ export default function StockMovementsPage() {
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     end: new Date(),
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [movementToDelete, setMovementToDelete] = useState<StockMovement | null>(null);
 
-  // Filtrar movimentações
-  const filteredMovements = mockMovements.filter((movement) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      movement.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      movement.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      movement.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (movement.reference &&
-        movement.reference.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Load movements data
+  useEffect(() => {
+    loadMovements();
+  }, [pagination.page, searchTerm, filterType, dateRange]);
 
-    const matchesType = filterType === "all" || movement.type === filterType;
-    const matchesReason =
-      filterReason === "all" || movement.reason === filterReason;
+  const loadMovements = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit,
+        ...(searchTerm && { search: searchTerm }),
+        ...(filterType !== 'all' && { type: filterType }),
+        startDate: dateRange.start.toISOString().split('T')[0],
+        endDate: dateRange.end.toISOString().split('T')[0],
+      };
+      
+      const response = await inventoryAPI.getMovements(params);
+      setMovements(response.movements);
+      setStats(response.stats);
+      setPagination(prev => ({
+        ...prev,
+        total: response.pagination.total,
+        pages: response.pagination.pages,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar movimentações');
+      console.error('Erro ao carregar movimentações:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const matchesDate =
-      movement.date >= dateRange.start && movement.date <= dateRange.end;
+  const handleDeleteMovement = async () => {
+    if (!movementToDelete) return;
+    
+    try {
+      await inventoryAPI.deleteMovement(movementToDelete.movement_id);
+      setShowDeleteModal(false);
+      setMovementToDelete(null);
+      loadMovements(); // Refresh the list
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao cancelar movimentação');
+    }
+  };
 
-    return matchesSearch && matchesType && matchesReason && matchesDate;
-  });
+  const handleExport = async () => {
+    try {
+      const params = {
+        ...(searchTerm && { search: searchTerm }),
+        ...(filterType !== 'all' && { type: filterType }),
+        startDate: dateRange.start.toISOString().split('T')[0],
+        endDate: dateRange.end.toISOString().split('T')[0],
+        format: 'xlsx' as const,
+      };
+      
+      const blob = await inventoryAPI.exportMovements(params);
+      const filename = `movimentacoes_estoque_${dateRange.start.toISOString().split('T')[0]}_${dateRange.end.toISOString().split('T')[0]}.xlsx`;
+      inventoryAPI.downloadExportFile(blob, filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao exportar movimentações');
+    }
+  };
 
-  // Estatísticas
-  const totalMovements = filteredMovements.length;
-  const totalEntries = filteredMovements.filter((m) => m.type === "IN").length;
-  const totalExits = filteredMovements.filter((m) => m.type === "OUT").length;
-  const totalAdjustments = filteredMovements.filter(
-    (m) => m.type === "ADJUST",
-  ).length;
+  // Statistics from API response
+  const totalMovements = movements.length;
+  const totalEntries = stats?.summary?.in?.count || 0;
+  const totalExits = stats?.summary?.out?.count || 0;
+  const totalAdjustments = stats?.summary?.adjustment?.count || 0;
 
   const getMovementIcon = (type: string) => {
     switch (type) {
@@ -204,38 +162,36 @@ export default function StockMovementsPage() {
         return TrendingUp;
       case "OUT":
         return TrendingDown;
-      case "ADJUST":
+      case "ADJUSTMENT":
         return BarChart3;
       default:
         return Package;
     }
   };
 
-  const getMovementColor = (type: string) => {
-    switch (type) {
-      case "IN":
-        return "text-success bg-success/10";
-      case "OUT":
-        return "text-error bg-error/10";
-      case "ADJUST":
-        return "text-warning bg-warning/10";
-      default:
-        return "text-text-tertiary bg-background-secondary";
-    }
+  const canDeleteMovement = (movement: StockMovement): boolean => {
+    const movementDate = new Date(movement.created_at);
+    const dayAgo = new Date();
+    dayAgo.setDate(dayAgo.getDate() - 1);
+    return movementDate >= dayAgo && user?.role === 'ADMIN';
   };
 
-  const getMovementLabel = (type: string) => {
-    switch (type) {
-      case "IN":
-        return "Entrada";
-      case "OUT":
-        return "Saída";
-      case "ADJUST":
-        return "Ajuste";
-      default:
-        return type;
-    }
-  };
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="text-center text-error">Erro: {error}</div>
+        <Button onClick={() => loadMovements()}>Tentar Novamente</Button>
+      </div>
+    );
+  }
 
   const getReasonIcon = (reason: string) => {
     if (reason.includes("Compra") || reason.includes("Reposição"))
@@ -253,8 +209,8 @@ export default function StockMovementsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/inventory">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar para Estoque
             </Link>
@@ -270,12 +226,12 @@ export default function StockMovementsPage() {
         </div>
 
         <div className="flex items-center space-x-2">
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
-          <Button>
-            <Link href="/dashboard/inventory/movements/new">
+          <Button asChild>
+            <Link href="/dashboard/inventory/movements/new" className="flex items-center">
               <Plus className="w-4 h-4 mr-2" />
               Nova Movimentação
             </Link>
@@ -423,14 +379,14 @@ export default function StockMovementsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-text-primary">
-              Movimentações ({filteredMovements.length})
+              Movimentações ({totalMovements})
             </h3>
             <div className="flex items-center space-x-2">
               <Button variant="ghost" size="sm">
                 <Filter className="w-4 h-4 mr-1" />
                 Filtrar
               </Button>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" onClick={handleExport}>
                 <Download className="w-4 h-4 mr-1" />
                 Exportar
               </Button>
@@ -448,17 +404,17 @@ export default function StockMovementsPage() {
                 <TableHead>Data</TableHead>
                 <TableHead>Usuário</TableHead>
                 <TableHead>Referência</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead className="w-20">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMovements.map((movement, index) => {
+              {movements.map((movement, index) => {
                 const MovementIcon = getMovementIcon(movement.type);
                 const ReasonIcon = getReasonIcon(movement.reason);
 
                 return (
                   <motion.tr
-                    key={movement.id}
+                    key={movement.movement_id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
@@ -467,12 +423,12 @@ export default function StockMovementsPage() {
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${getMovementColor(movement.type)}`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center ${inventoryAPI.getMovementTypeColor(movement.type)}`}
                         >
                           <MovementIcon className="w-4 h-4" />
                         </div>
                         <span className="font-medium text-text-primary">
-                          {getMovementLabel(movement.type)}
+                          {inventoryAPI.getMovementTypeLabel(movement.type)}
                         </span>
                       </div>
                     </TableCell>
@@ -486,7 +442,7 @@ export default function StockMovementsPage() {
                             {movement.product.name}
                           </div>
                           <div className="text-sm text-text-secondary">
-                            {movement.product.type}
+                            {movement.product.category}
                           </div>
                         </div>
                       </div>
@@ -502,15 +458,7 @@ export default function StockMovementsPage() {
                                 : "text-warning"
                           }`}
                         >
-                          {movement.type === "IN"
-                            ? "+"
-                            : movement.type === "OUT"
-                              ? "-"
-                              : ""}
-                          {Math.abs(movement.quantity)}
-                        </span>
-                        <span className="text-text-secondary text-sm">
-                          {movement.product.unit}
+                          {inventoryAPI.formatMovementQuantity(movement)}
                         </span>
                       </div>
                     </TableCell>
@@ -523,13 +471,13 @@ export default function StockMovementsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-text-secondary">
-                      {formatDate(movement.date)}
+                      {formatDate(new Date(movement.created_at))}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <User className="w-4 h-4 text-text-tertiary" />
                         <span className="text-text-primary">
-                          {movement.user}
+                          {movement.user.name}
                         </span>
                       </div>
                     </TableCell>
@@ -543,9 +491,24 @@ export default function StockMovementsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Eye className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center space-x-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        {canDeleteMovement(movement) && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-error hover:text-error"
+                            onClick={() => {
+                              setMovementToDelete(movement);
+                              setShowDeleteModal(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </motion.tr>
                 );
@@ -553,7 +516,7 @@ export default function StockMovementsPage() {
             </TableBody>
           </Table>
 
-          {filteredMovements.length === 0 && (
+          {movements.length === 0 && (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
               <h3 className="text-lg font-medium text-text-primary mb-2">
@@ -564,12 +527,42 @@ export default function StockMovementsPage() {
                   ? "Tente ajustar os filtros de busca"
                   : "Nenhuma movimentação registrada no período selecionado"}
               </p>
-              <Button>
-                <Link href="/dashboard/inventory/movements/new">
+              <Button asChild>
+                <Link href="/dashboard/inventory/movements/new" className="flex items-center justify-center">
                   <Plus className="w-4 h-4 mr-2" />
                   Nova Movimentação
                 </Link>
               </Button>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-text-secondary">
+                Mostrando {((pagination.page - 1) * pagination.limit) + 1} - {Math.min(pagination.page * pagination.limit, pagination.total)} de {pagination.total} movimentações
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  disabled={pagination.page <= 1}
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm text-text-secondary">
+                  Página {pagination.page} de {pagination.pages}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  disabled={pagination.page >= pagination.pages}
+                  onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                >
+                  Próxima
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -587,12 +580,12 @@ export default function StockMovementsPage() {
             <div className="space-y-4">
               {["Medicamento", "Alimento", "Higiene", "Acessório"].map(
                 (category, index) => {
-                  const categoryMovements = filteredMovements.filter(
-                    (m) => m.product.type === category,
+                  const categoryMovements = movements.filter(
+                    (m) => m.product.category === category,
                   );
                   const percentage =
-                    filteredMovements.length > 0
-                      ? (categoryMovements.length / filteredMovements.length) *
+                    movements.length > 0
+                      ? (categoryMovements.length / movements.length) *
                         100
                       : 0;
 
@@ -639,10 +632,10 @@ export default function StockMovementsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Array.from(new Set(filteredMovements.map((m) => m.user)))
-                .map((user) => ({
-                  user,
-                  count: filteredMovements.filter((m) => m.user === user)
+              {Array.from(new Set(movements.map((m) => m.user.name)))
+                .map((userName) => ({
+                  user: userName,
+                  count: movements.filter((m) => m.user.name === userName)
                     .length,
                 }))
                 .sort((a, b) => b.count - a.count)
@@ -677,6 +670,65 @@ export default function StockMovementsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Movement Modal */}
+      {showDeleteModal && movementToDelete && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-neutral-900 bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-surface rounded-lg p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-error/10 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-error" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">
+                  Cancelar Movimentação
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  Esta ação reverterá o estoque do produto
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-text-secondary mb-2">
+                <strong>Produto:</strong> {movementToDelete.product.name}
+              </p>
+              <p className="text-text-secondary mb-2">
+                <strong>Tipo:</strong> {inventoryAPI.getMovementTypeLabel(movementToDelete.type)}
+              </p>
+              <p className="text-text-secondary">
+                <strong>Quantidade:</strong> {inventoryAPI.formatMovementQuantity(movementToDelete)}
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDeleteMovement}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Cancelar Movimentação
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

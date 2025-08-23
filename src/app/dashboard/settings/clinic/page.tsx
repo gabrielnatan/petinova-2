@@ -56,9 +56,9 @@ export default function ClinicSettingsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/settings">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/settings" className="flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Link>
         </Button>
@@ -239,8 +239,8 @@ export default function ClinicSettingsPage() {
 
         {/* Actions */}
         <div className="flex justify-end space-x-4">
-          <Button variant="secondary">
-            <Link href="/dashboard/settings">Cancelar</Link>
+          <Button variant="secondary" asChild>
+            <Link href="/dashboard/settings" className="flex items-center justify-center">Cancelar</Link>
           </Button>
           <Button type="submit" loading={isSubmitting}>
             <Save className="w-4 h-4 mr-2" />

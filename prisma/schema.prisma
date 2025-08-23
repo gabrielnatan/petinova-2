@@ -1,0 +1,175 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Clinic {
+  id         String   @id @default(cuid())
+  legalName  String
+  tradeName  String
+  cnpj       String   @unique
+  email      String
+  phone      String?
+  address    String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // Relacionamentos
+  users User[]
+  pets  Pet[]
+  
+  @@map("clinics")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(VETERINARIAN)
+  active    Boolean  @default(true)
+  clinicId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultations Consultation[]
+  appointments  Appointment[]
+  refreshTokens RefreshToken[]
+  
+  @@map("users")
+}
+
+model Pet {
+  id          String    @id @default(cuid())
+  name        String
+  species     String
+  breed       String?
+  size        String?
+  weight      Float?
+  isNeutered  Boolean   @default(false)
+  environment String?
+  birthDate   DateTime?
+  deathDate   DateTime?
+  notes       String?
+  avatarUrl   String?
+  guardianId  String
+  clinicId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relacionamentos
+  guardian      Guardian       @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultations Consultation[]
+  appointments  Appointment[]
+  
+  @@map("pets")
+}
+
+model Guardian {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  pets         Pet[]
+  appointments Appointment[]
+  
+  @@map("guardians")
+}
+
+model Consultation {
+  id          String   @id @default(cuid())
+  petId       String
+  veterinarianId String
+  diagnosis   String?
+  treatment   String?
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relacionamentos
+  pet          Pet  @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian User @relation(fields: [veterinarianId], references: [id])
+  
+  @@map("consultations")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  petId       String
+  guardianId  String
+  veterinarianId String
+  date        DateTime
+  status      AppointmentStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  
+  // Relacionamentos
+  pet          Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
+  guardian     Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  veterinarian User     @relation(fields: [veterinarianId], references: [id])
+  
+  @@map("appointments")
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  quantity    Int      @default(0)
+  price       Float?
+  supplier    String?
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("inventory_items")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  VETERINARIAN
+  ASSISTANT
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}

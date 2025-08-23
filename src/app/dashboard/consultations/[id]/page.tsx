@@ -144,8 +144,8 @@ export default function ConsultationDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/consultations">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/consultations" className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>
@@ -211,8 +211,8 @@ export default function ConsultationDetailPage() {
             )}
           </div>
 
-          <Button>
-            <Link href={`/dashboard/consultations/${appointmentId}/edit`}>
+          <Button asChild>
+            <Link href={`/dashboard/consultations/${appointmentId}/edit`} className="flex items-center">
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Link>
@@ -376,9 +376,9 @@ export default function ConsultationDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="secondary" size="sm">
+                  <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/pets/${mockConsultation.pet.pet_id}`}
+                      href={`/dashboard/pets/${mockConsultation.pet.pet_id}`} className="flex items-center"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Ver Perfil
@@ -426,9 +426,9 @@ export default function ConsultationDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <Button variant="secondary" size="sm">
+                  <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/guardians/${mockConsultation.guardian.guardian_id}`}
+                      href={`/dashboard/guardians/${mockConsultation.guardian.guardian_id}`} className="flex items-center"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Ver Perfil
@@ -534,9 +534,9 @@ export default function ConsultationDetailPage() {
                 </h3>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full" asChild>
                   <Link
-                    href={`/dashboard/consultations/${appointmentId}/prescription`}
+                    href={`/dashboard/consultations/${appointmentId}/prescription`} className="flex items-center"
                   >
                     <Pill className="w-4 h-4 mr-2" />
                     Ver Receituário
@@ -615,9 +615,9 @@ export default function ConsultationDetailPage() {
                   <Printer className="w-4 h-4 mr-2" />
                   Imprimir
                 </Button>
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" asChild>
                   <Link
-                    href={`/dashboard/consultations/${appointmentId}/prescription`}
+                    href={`/dashboard/consultations/${appointmentId}/prescription`} className="flex items-center"
                   >
                     <Eye className="w-4 h-4 mr-2" />
                     Ver Completo

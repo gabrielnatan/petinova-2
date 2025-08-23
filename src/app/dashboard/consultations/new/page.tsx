@@ -1,4 +1,3 @@
-//@ts-nocheck
 "use client";
 
 import React, { useState } from "react";
@@ -22,26 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
-
-// Mock data for selects
-const mockAppointments = [
-  {
-    id: "1",
-    dateTime: new Date(2025, 0, 28, 9, 0),
-    pet: { name: "Buddy", species: "Cão" },
-    guardian: { fullName: "João Silva" },
-    veterinarian: { fullName: "Dra. Maria Santos" },
-    status: "confirmed",
-  },
-  {
-    id: "2",
-    dateTime: new Date(2025, 0, 28, 14, 30),
-    pet: { name: "Luna", species: "Gato" },
-    guardian: { fullName: "Pedro Costa" },
-    veterinarian: { fullName: "Dr. Carlos Lima" },
-    status: "confirmed",
-  },
-];
+import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
+import { appointmentAPI } from "@/lib/api/appointments";
+import { useAuth } from "@/store";
+import { useRouter } from "next/navigation";
 
 const paymentMethods = [
   { value: "cash", label: "Dinheiro" },
@@ -93,9 +76,9 @@ export default function NewConsultationPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/consultations">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/consultations" className="flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Link>
         </Button>
@@ -335,8 +318,8 @@ export default function NewConsultationPage() {
 
         {/* Actions */}
         <div className="flex justify-end space-x-4">
-          <Button variant="secondary">
-            <Link href="/dashboard/consultations">Cancelar</Link>
+          <Button variant="secondary" asChild>
+            <Link href="/dashboard/consultations" className="flex items-center justify-center">Cancelar</Link>
           </Button>
           <Button type="submit" loading={isSubmitting}>
             <Save className="w-4 h-4 mr-2" />

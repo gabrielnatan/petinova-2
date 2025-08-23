@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -16,6 +15,10 @@ import {
   Edit,
   Eye,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  Grid3X3,
+  List,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,57 +32,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCPF, formatPhone } from "@/lib/utils";
+import { guardianAPI, type Guardian } from "@/lib/api/guardians";
 import Link from "next/link";
 
-// Mock data
-const mockGuardians = [
-  {
-    guardian_id: "1",
-    fullName: "João Silva",
-    cpf: "12345678901",
-    email: "joao@email.com",
-    phone: "11999999999",
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-    birthDate: new Date("1985-03-15"),
-    gender: "Male",
-    pets: [
-      { name: "Buddy", species: "Cão" },
-      { name: "Rex", species: "Cão" },
-    ],
-    created_at: new Date("2024-01-15"),
-  },
-  {
-    guardian_id: "2",
-    fullName: "Maria Santos",
-    cpf: "98765432109",
-    email: "maria@email.com",
-    phone: "11888888888",
-    address: "Av. Paulista, 456 - Bela Vista, São Paulo - SP",
-    birthDate: new Date("1990-07-22"),
-    gender: "Female",
-    pets: [{ name: "Luna", species: "Gato" }],
-    created_at: new Date("2024-02-10"),
-  },
-  {
-    guardian_id: "3",
-    fullName: "Pedro Costa",
-    cpf: "11122233344",
-    email: "pedro@email.com",
-    phone: "11777777777",
-    address: "Rua Augusta, 789 - Consolação, São Paulo - SP",
-    birthDate: new Date("1978-11-08"),
-    gender: "Male",
-    pets: [
-      { name: "Max", species: "Cão" },
-      { name: "Mia", species: "Gato" },
-      { name: "Bob", species: "Cão" },
-    ],
-    created_at: new Date("2024-03-05"),
-  },
-];
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
-function GuardianCard({ guardian }: { guardian: any }) {
+function GuardianCard({ 
+  guardian, 
+  onDelete, 
+  deleting 
+}: { 
+  guardian: Guardian;
+  onDelete: (id: string, name: string) => void;
+  deleting: boolean;
+}) {
   const [showMenu, setShowMenu] = useState(false);
+
+  const formatAddress = (address: Guardian['address']) => {
+    if (!address) return 'Endereço não informado';
+    return `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ''} - ${address.neighborhood}, ${address.city} - ${address.state}`;
+  };
 
   return (
     <motion.div
@@ -88,7 +65,7 @@ function GuardianCard({ guardian }: { guardian: any }) {
       whileHover={{ y: -5 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className="hover:shadow-lg transition-shadow duration-200 relative">
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -99,9 +76,11 @@ function GuardianCard({ guardian }: { guardian: any }) {
                 <h3 className="text-lg font-semibold text-text-primary">
                   {guardian.fullName}
                 </h3>
-                <p className="text-sm text-text-secondary">
-                  CPF: {formatCPF(guardian.cpf)}
-                </p>
+                {guardian.cpf && (
+                  <p className="text-sm text-text-secondary">
+                    CPF: {formatCPF(guardian.cpf)}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -122,30 +101,38 @@ function GuardianCard({ guardian }: { guardian: any }) {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
-                  <Link
-                    href={`/dashboard/guardians/${guardian.guardian_id}`}
-                    className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link href={`/dashboard/guardians/${guardian.guardian_id}`} className="flex items-center">
+                      <Eye className="w-4 h-4 mr-2" />
+                      Ver Perfil
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link href={`/dashboard/guardians/${guardian.guardian_id}/edit`} className="flex items-center">
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-error hover:bg-error/10"
+                    onClick={() => onDelete(guardian.guardian_id, guardian.fullName)}
+                    disabled={deleting}
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Ver Perfil
-                  </Link>
-                  <Link
-                    href={`/dashboard/guardians/${guardian.guardian_id}/edit`}
-                    className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar
-                  </Link>
-                  <button className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
-                  </button>
+                    {deleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-error mr-2"></div>
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    {deleting ? 'Excluindo...' : 'Excluir'}
+                  </Button>
                 </motion.div>
               )}
             </div>
           </div>
 
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2">
             <div className="flex items-center text-sm text-text-secondary">
               <Mail className="w-4 h-4 mr-2" />
               {guardian.email}
@@ -154,43 +141,39 @@ function GuardianCard({ guardian }: { guardian: any }) {
               <Phone className="w-4 h-4 mr-2" />
               {formatPhone(guardian.phone)}
             </div>
-            <div className="flex items-start text-sm text-text-secondary">
-              <MapPin className="w-4 h-4 mr-2 mt-0.5" />
-              <span className="line-clamp-2">{guardian.address}</span>
+            {guardian.address && (
+              <div className="flex items-start text-sm text-text-secondary">
+                <MapPin className="w-4 h-4 mr-2 mt-0.5" />
+                <span className="line-clamp-2">{formatAddress(guardian.address)}</span>
+              </div>
+            )}
+            <div className="flex items-center text-sm text-text-secondary">
+              <Heart className="w-4 h-4 mr-2" />
+              {guardian.petsCount || 0} pet{(guardian.petsCount || 0) !== 1 ? "s" : ""}
             </div>
           </div>
 
-          <div className="border-t border-border pt-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2 text-sm text-text-secondary">
-                <Heart className="w-4 h-4" />
-                <span>
-                  {guardian.pets.length} pet
-                  {guardian.pets.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="flex -space-x-1">
-                {guardian.pets.slice(0, 3).map((pet: { name: string | undefined; species: string; }, index: React.Key | null | undefined) => (
+          {/* Pets Preview */}
+          {guardian.pets && guardian.pets.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-text-primary mb-2">Pets:</p>
+              <div className="flex flex-wrap gap-1">
+                {guardian.pets.slice(0, 3).map((pet) => (
                   <div
-                    key={index}
-                    className="w-6 h-6 bg-secondary-100 border-2 border-surface rounded-full flex items-center justify-center"
-                    title={pet.name}
+                    key={pet.pet_id}
+                    className="px-2 py-1 bg-secondary-100 text-secondary-700 text-xs rounded-full"
                   >
-                    <span className="text-xs text-secondary-600">
-                      {pet.species === "Cão" ? "🐕" : "🐱"}
-                    </span>
+                    {pet.name} ({pet.species})
                   </div>
                 ))}
                 {guardian.pets.length > 3 && (
-                  <div className="w-6 h-6 bg-neutral-100 border-2 border-surface rounded-full flex items-center justify-center">
-                    <span className="text-xs text-neutral-600">
-                      +{guardian.pets.length - 3}
-                    </span>
+                  <div className="px-2 py-1 bg-neutral-100 text-neutral-600 text-xs rounded-full">
+                    +{guardian.pets.length - 3} mais
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>
@@ -200,15 +183,84 @@ function GuardianCard({ guardian }: { guardian: any }) {
 export default function GuardiansListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
+  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const filteredGuardians = searchTerm
-    ? mockGuardians.filter(
-        (guardian) =>
-          guardian.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          guardian.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          guardian.phone.includes(searchTerm),
-      )
-    : mockGuardians;
+  const formatAddress = (address: Guardian['address']) => {
+    if (!address) return 'Endereço não informado';
+    return `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ''} - ${address.neighborhood}, ${address.city} - ${address.state}`;
+  };
+
+  const loadGuardians = async (page = 1, search = "") => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await guardianAPI.getGuardians({
+        page,
+        limit: 10,
+        search: search.trim() || undefined
+      });
+      setGuardians(response.guardians);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar tutores');
+      setGuardians([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadGuardians(1);
+  }, []);
+
+  useEffect(() => {
+    if (searchDebounce) {
+      clearTimeout(searchDebounce);
+    }
+
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      loadGuardians(1, searchTerm);
+    }, 500);
+
+    setSearchDebounce(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchTerm]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    loadGuardians(page, searchTerm);
+  };
+
+  const handleDelete = async (guardianId: string, guardianName: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o tutor ${guardianName}?`)) {
+      return;
+    }
+
+    try {
+      setDeleting(guardianId);
+      await guardianAPI.deleteGuardian(guardianId);
+      await loadGuardians(currentPage, searchTerm);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao excluir tutor');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -220,18 +272,18 @@ export default function GuardiansListPage() {
             Gerencie os tutores responsáveis pelos pets
           </p>
         </div>
-        <Button>
-          <Link href="/dashboard/guardians/new">
-            <Plus className="w-4 h-4 mr-2" />
+        <Button asChild>
+          <Link href="/dashboard/guardians/new" className="flex items-center gap-2">
+            <Plus className="w-4 h-4" />
             Novo Tutor
           </Link>
         </Button>
       </div>
 
-      {/* Filters and View Toggle */}
+      {/* Filters */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="flex-1 max-w-md">
+          <div className="max-w-md">
             <Input
               placeholder="Buscar por nome, email ou telefone..."
               value={searchTerm}
@@ -239,39 +291,42 @@ export default function GuardiansListPage() {
               icon={Search}
             />
           </div>
-          <Button variant="secondary">
+
+          <Button variant="secondary" className="flex items-center">
             <Filter className="w-4 h-4 mr-2" />
             Filtros
           </Button>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center border border-border rounded-md">
           <Button
-            variant={viewMode === "cards" ? "primary" : "ghost"}
+            variant={viewMode === "cards" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("cards")}
+            className="rounded-r-none border-r"
           >
-            Cards
+            <Grid3X3 className="w-4 h-4" />
           </Button>
           <Button
-            variant={viewMode === "table" ? "primary" : "ghost"}
+            variant={viewMode === "table" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("table")}
+            className="rounded-l-none"
           >
-            Tabela
+            <List className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-secondary">Total de Tutores</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockGuardians.length}
+                  {pagination.total}
                 </p>
               </div>
               <User className="w-8 h-8 text-primary-500" />
@@ -283,25 +338,9 @@ export default function GuardiansListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">Novos este Mês</p>
-                <p className="text-2xl font-bold text-text-primary">3</p>
-              </div>
-              <div className="w-8 h-8 bg-success rounded-full flex items-center justify-center">
-                <Plus className="w-4 h-4 text-white" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-text-secondary">
-                  Com Múltiplos Pets
-                </p>
+                <p className="text-sm text-text-secondary">Com Pets</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockGuardians.filter((g) => g.pets.length > 1).length}
+                  {guardians.filter(g => (g.petsCount || 0) > 0).length}
                 </p>
               </div>
               <Heart className="w-8 h-8 text-secondary-500" />
@@ -313,105 +352,203 @@ export default function GuardiansListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">Total de Pets</p>
+                <p className="text-sm text-text-secondary">Novos este Mês</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockGuardians.reduce((total, g) => total + g.pets.length, 0)}
+                  {guardians.filter(g => {
+                    const createdDate = new Date(g.created_at);
+                    const now = new Date();
+                    return createdDate.getMonth() === now.getMonth() && 
+                           createdDate.getFullYear() === now.getFullYear();
+                  }).length}
                 </p>
               </div>
-              <Heart className="w-8 h-8 text-accent-500" />
+              <Plus className="w-8 h-8 text-accent-500" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Content */}
-      {viewMode === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredGuardians.map((guardian, index) => (
-            <motion.div
-              key={guardian.guardian_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <GuardianCard guardian={guardian} />
-            </motion.div>
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Pets</TableHead>
-                <TableHead>Cadastro</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGuardians.map((guardian) => (
-                <TableRow key={guardian.guardian_id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                        <User className="w-4 h-4 text-primary-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-text-primary">
-                          {guardian.fullName}
-                        </div>
-                        <div className="text-sm text-text-secondary">
-                          CPF: {formatCPF(guardian.cpf)}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-text-secondary">
-                    {guardian.email}
-                  </TableCell>
-                  <TableCell className="text-text-secondary">
-                    {formatPhone(guardian.phone)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <span className="text-text-primary font-medium">
-                        {guardian.pets.length}
-                      </span>
-                      <Heart className="w-4 h-4 text-text-tertiary" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-text-secondary">
-                    {guardian.created_at.toLocaleDateString("pt-BR")}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="w-4 h-4" />
+      {viewMode === "cards" && (
+        <>
+          {loading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                <p className="text-text-secondary">Carregando tutores...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <div className="text-error mb-4">{error}</div>
+              <Button onClick={() => loadGuardians(currentPage, searchTerm)}>
+                Tentar novamente
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {guardians.map((guardian, index) => (
+                  <motion.div
+                    key={guardian.guardian_id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <GuardianCard 
+                      guardian={guardian} 
+                      onDelete={handleDelete}
+                      deleting={deleting === guardian.guardian_id}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+              
+              {pagination.pages > 1 && (
+                <div className="flex items-center justify-between mt-8">
+                  <div className="text-sm text-text-secondary">
+                    Mostrando {((currentPage - 1) * pagination.limit) + 1} até {Math.min(currentPage * pagination.limit, pagination.total)} de {pagination.total} tutores
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1 || loading}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Anterior
                     </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    
+                    {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                      const page = i + Math.max(1, currentPage - 2);
+                      if (page > pagination.pages) return null;
+                      
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          disabled={loading}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= pagination.pages || loading}
+                    >
+                      Próximo
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {viewMode === "table" && (
+        <Card>
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>
+                  <p className="text-text-secondary">Carregando tutores...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <div className="text-error mb-4">{error}</div>
+                <Button onClick={() => loadGuardians(currentPage, searchTerm)}>
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Telefone</TableHead>
+                    <TableHead>Pets</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {guardians.map((guardian) => (
+                    <TableRow key={guardian.guardian_id}>
+                      <TableCell className="font-medium">
+                        {guardian.fullName}
+                      </TableCell>
+                      <TableCell>{guardian.email}</TableCell>
+                      <TableCell>{formatPhone(guardian.phone)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <Heart className="w-4 h-4 text-primary-500" />
+                          <span>{guardian.petsCount || 0}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/dashboard/guardians/${guardian.guardian_id}`}>
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link
+                              href={`/dashboard/guardians/${guardian.guardian_id}/edit`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDelete(guardian.guardian_id, guardian.fullName)}
+                            disabled={deleting === guardian.guardian_id}
+                          >
+                            {deleting === guardian.guardian_id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-error"></div>
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
         </Card>
       )}
 
-      {filteredGuardians.length === 0 && (
+      {!loading && !error && guardians.length === 0 && (
         <div className="text-center py-12">
           <User className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
-            Nenhum tutor encontrado
+            {searchTerm
+              ? "Nenhum tutor encontrado"
+              : "Nenhum tutor cadastrado"}
           </h3>
           <p className="text-text-secondary mb-4">
             {searchTerm
               ? "Tente ajustar sua busca"
               : "Comece cadastrando o primeiro tutor"}
           </p>
-          <Button>
-            <Link href="/dashboard/guardians/new">
-              <Plus className="w-4 h-4 mr-2" />
+          <Button asChild>
+            <Link href="/dashboard/guardians/new" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
               Cadastrar Tutor
             </Link>
           </Button>

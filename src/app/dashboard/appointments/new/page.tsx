@@ -324,8 +324,8 @@ export default function NewAppointmentPage() {
             </div>
 
             <div className="text-center pt-4">
-              <Button variant="secondary">
-                <Link href="/dashboard/pets/new">
+              <Button variant="secondary" asChild>
+                <Link href="/dashboard/pets/new" className="flex items-center">
                   <Plus className="w-4 h-4 mr-2" />
                   Cadastrar Novo Pet
                 </Link>
@@ -356,7 +356,7 @@ export default function NewAppointmentPage() {
                   </div>
                   <div>
                     <h3 className="font-medium text-text-primary">
-                      {selectedGuardian.fullName}
+                      {selectedGuardian.name}
                     </h3>
                     <p className="text-sm text-text-secondary">Tutor</p>
                   </div>
@@ -489,8 +489,8 @@ export default function NewAppointmentPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/appointments">
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/appointments" className="flex items-center">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar
           </Link>
@@ -597,8 +597,8 @@ export default function NewAppointmentPage() {
               >
                 Cancelar
               </Button>
-              <Button>
-                <Link href="/dashboard/guardians/new">
+              <Button asChild>
+                <Link href="/dashboard/guardians/new" className="flex items-center">
                   <Plus className="w-4 h-4 mr-2" />
                   Ir para Cadastro
                 </Link>

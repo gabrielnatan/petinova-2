@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -22,133 +21,35 @@ import {
   UserX,
   Save,
   X,
+  Key,
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { userAPI, type User } from "@/lib/api/users";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-// Mock data
-const mockUsers = [
-  {
-    id: "1",
-    name: "Dr. João Silva",
-    email: "joao.silva@clinica.com",
-    role: "admin",
-    status: "active",
-    phone: "11999999999",
-    lastLogin: new Date("2025-01-28T08:30:00"),
-    createdAt: new Date("2024-01-15"),
-    permissions: ["read", "write", "delete", "admin"],
-    avatar: null,
-    veterinarianId: "vet_1",
-    guardianId: null,
-  },
-  {
-    id: "2",
-    name: "Dra. Maria Santos",
-    email: "maria.santos@clinica.com",
-    role: "veterinarian",
-    status: "active",
-    phone: "11888888888",
-    lastLogin: new Date("2025-01-28T07:15:00"),
-    createdAt: new Date("2024-02-20"),
-    permissions: ["read", "write"],
-    avatar: null,
-    veterinarianId: "vet_2",
-    guardianId: null,
-  },
-  {
-    id: "3",
-    name: "Carlos Mendes",
-    email: "carlos@email.com",
-    role: "client",
-    status: "active",
-    phone: "11777777777",
-    lastLogin: new Date("2025-01-27T19:45:00"),
-    createdAt: new Date("2024-03-10"),
-    permissions: ["read"],
-    avatar: null,
-    veterinarianId: null,
-    guardianId: "guard_1",
-  },
-  {
-    id: "4",
-    name: "Ana Oliveira",
-    email: "ana.oliveira@clinica.com",
-    role: "receptionist",
-    status: "active",
-    phone: "11666666666",
-    lastLogin: new Date("2025-01-28T09:00:00"),
-    createdAt: new Date("2024-04-05"),
-    permissions: ["read", "write"],
-    avatar: null,
-    veterinarianId: null,
-    guardianId: null,
-  },
-  {
-    id: "5",
-    name: "Pedro Costa",
-    email: "pedro@email.com",
-    role: "client",
-    status: "inactive",
-    phone: "11555555555",
-    lastLogin: new Date("2024-12-15T14:20:00"),
-    createdAt: new Date("2024-05-18"),
-    permissions: ["read"],
-    avatar: null,
-    veterinarianId: null,
-    guardianId: "guard_2",
-  },
-];
+const roleLabels = {
+  ADMIN: 'Administrador',
+  VETERINARIAN: 'Veterinário',
+  RECEPTIONIST: 'Recepcionista'
+};
 
-const roles = [
-  {
-    id: "admin",
-    name: "Administrador",
-    description: "Acesso total ao sistema",
-    icon: Crown,
-    color: "primary",
-    permissions: ["read", "write", "delete", "admin"],
-  },
-  {
-    id: "veterinarian",
-    name: "Veterinário",
-    description: "Acesso a consultas e prontuários",
-    icon: UserCheck,
-    color: "secondary",
-    permissions: ["read", "write"],
-  },
-  {
-    id: "receptionist",
-    name: "Recepcionista",
-    description: "Agendamentos e cadastros básicos",
-    icon: User,
-    color: "accent",
-    permissions: ["read", "write"],
-  },
-  {
-    id: "client",
-    name: "Cliente",
-    description: "Acesso limitado aos próprios dados",
-    icon: Users,
-    color: "neutral",
-    permissions: ["read"],
-  },
-];
+const roleColors = {
+  ADMIN: 'primary',
+  VETERINARIAN: 'secondary',
+  RECEPTIONIST: 'accent'
+};
 
-const permissions = [
-  { id: "read", name: "Visualizar", description: "Pode ver informações" },
-  { id: "write", name: "Editar", description: "Pode criar e editar" },
-  { id: "delete", name: "Excluir", description: "Pode excluir registros" },
-  {
-    id: "admin",
-    name: "Administrar",
-    description: "Acesso administrativo completo",
-  },
-];
+const roleIcons = {
+  ADMIN: Crown,
+  VETERINARIAN: UserCheck,
+  RECEPTIONIST: User
+};
 
-const formatDateTime = (date) => {
-  return date.toLocaleString("pt-BR", {
+const formatDateTime = (date: string) => {
+  return new Date(date).toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -157,13 +58,15 @@ const formatDateTime = (date) => {
   });
 };
 
-const formatPhone = (phone) => {
+const formatPhone = (phone: string | undefined) => {
+  if (!phone) return '-';
   return phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
 };
 
-const getTimeAgo = (date) => {
+const getTimeAgo = (date: string) => {
   const now = new Date();
-  const diff = now.getTime() - date.getTime();
+  const past = new Date(date);
+  const diff = now.getTime() - past.getTime();
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
@@ -171,72 +74,87 @@ const getTimeAgo = (date) => {
   return `${days} dias atrás`;
 };
 
-const getRoleInfo = (roleId) => {
-  return roles.find((role) => role.id === roleId) || roles[3];
-};
-
-const getStatusColor = (status) => {
-  switch (status) {
-    case "active":
-      return "text-success";
-    case "inactive":
-      return "text-error";
-    case "pending":
-      return "text-warning";
-    default:
-      return "text-text-tertiary";
-  }
-};
-
-const getStatusIcon = (status) => {
-  switch (status) {
-    case "active":
-      return CheckCircle;
-    case "inactive":
-      return XCircle;
-    case "pending":
-      return AlertTriangle;
-    default:
-      return User;
-  }
-};
-
 export default function UsersSettingsPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showUserModal, setShowUserModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [userToDelete, setUserToDelete] = useState(null);
-  const [showUserMenu, setShowUserMenu] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
+  const [showUserMenu, setShowUserMenu] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  });
 
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
     phone: "",
-    role: "client",
-    status: "active",
+    role: "RECEPTIONIST" as 'ADMIN' | 'VETERINARIAN' | 'RECEPTIONIST',
     password: "",
     confirmPassword: "",
+    isActive: true
   });
 
-  const [errors, setErrors] = useState({});
+  const [passwordForm, setPasswordForm] = useState({
+    newPassword: "",
+    confirmPassword: ""
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filter users
-  const filteredUsers = mockUsers.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const matchesStatus =
-      statusFilter === "all" || user.status === statusFilter;
+  const router = useRouter();
 
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  useEffect(() => {
+    loadUsers();
+  }, [pagination.page, searchTerm, roleFilter, statusFilter]);
 
-  const handleUserFormChange = (field, value) => {
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+
+      if (searchTerm) params.search = searchTerm;
+      if (roleFilter !== 'all') params.role = roleFilter;
+      if (statusFilter !== 'all') params.isActive = statusFilter === 'active';
+
+      const response = await userAPI.getUsers(params);
+      setUsers(response.users);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar usuários');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleFilterChange = (filter: string, value: string) => {
+    if (filter === 'role') setRoleFilter(value);
+    if (filter === 'status') setStatusFilter(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleUserFormChange = (field: string, value: any) => {
     setUserForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
@@ -244,11 +162,10 @@ export default function UsersSettingsPage() {
   };
 
   const validateUserForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!userForm.name.trim()) newErrors.name = "Nome é obrigatório";
     if (!userForm.email.trim()) newErrors.email = "Email é obrigatório";
-    if (!userForm.phone.trim()) newErrors.phone = "Telefone é obrigatório";
 
     if (!editingUser) {
       if (!userForm.password) newErrors.password = "Senha é obrigatória";
@@ -257,9 +174,15 @@ export default function UsersSettingsPage() {
       }
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (userForm.email && !emailRegex.test(userForm.email)) {
+    if (userForm.email && !userAPI.validateEmail(userForm.email)) {
       newErrors.email = "Email inválido";
+    }
+
+    if (userForm.password) {
+      const passwordValidation = userAPI.validatePassword(userForm.password);
+      if (!passwordValidation.isValid) {
+        newErrors.password = passwordValidation.errors[0];
+      }
     }
 
     setErrors(newErrors);
@@ -271,83 +194,130 @@ export default function UsersSettingsPage() {
 
     setIsSubmitting(true);
     try {
-      console.log(editingUser ? "Updating user:" : "Creating user:", userForm);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert(
-        editingUser
-          ? "Usuário atualizado com sucesso!"
-          : "Usuário criado com sucesso!",
-      );
+      if (editingUser) {
+        await userAPI.updateUser(editingUser.user_id, {
+          name: userForm.name,
+          email: userForm.email,
+          phone: userForm.phone,
+          role: userForm.role,
+          isActive: userForm.isActive
+        });
+      } else {
+        await userAPI.createUser({
+          name: userForm.name,
+          email: userForm.email,
+          phone: userForm.phone,
+          role: userForm.role,
+          password: userForm.password,
+          isActive: userForm.isActive,
+          permissions: userAPI.generateDefaultPermissions(userForm.role),
+          preferences: userAPI.generateDefaultPreferences()
+        });
+      }
+
       setShowUserModal(false);
       setEditingUser(null);
       setUserForm({
         name: "",
         email: "",
         phone: "",
-        role: "client",
-        status: "active",
+        role: "RECEPTIONIST",
         password: "",
         confirmPassword: "",
+        isActive: true
       });
+      loadUsers();
     } catch (error) {
       console.error("Error submitting user:", error);
-      alert("Erro ao salvar usuário. Tente novamente.");
+      setError(error instanceof Error ? error.message : 'Erro ao salvar usuário');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEdit = (user) => {
+  const handleEdit = (user: User) => {
     setEditingUser(user);
     setUserForm({
       name: user.name,
       email: user.email,
-      phone: user.phone,
+      phone: user.phone || "",
       role: user.role,
-      status: user.status,
       password: "",
       confirmPassword: "",
+      isActive: user.isActive
     });
     setShowUserModal(true);
     setShowUserMenu(null);
   };
 
   const handleDelete = async () => {
+    if (!userToDelete) return;
+
     try {
-      console.log("Deleting user:", userToDelete.id);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      alert("Usuário excluído com sucesso!");
+      await userAPI.deleteUser(userToDelete.user_id);
       setShowDeleteModal(false);
       setUserToDelete(null);
+      loadUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
-      alert("Erro ao excluir usuário. Tente novamente.");
+      setError(error instanceof Error ? error.message : 'Erro ao excluir usuário');
     }
   };
 
-  const handleStatusToggle = async (user) => {
+  const handleStatusToggle = async (user: User) => {
     try {
-      const newStatus = user.status === "active" ? "inactive" : "active";
-      console.log("Toggling user status:", user.id, newStatus);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      alert(
-        `Usuário ${newStatus === "active" ? "ativado" : "desativado"} com sucesso!`,
-      );
+      await userAPI.toggleUserStatus(user.user_id, !user.isActive);
       setShowUserMenu(null);
+      loadUsers();
     } catch (error) {
       console.error("Error toggling user status:", error);
-      alert("Erro ao alterar status. Tente novamente.");
+      setError(error instanceof Error ? error.message : 'Erro ao alterar status');
     }
   };
+
+  const handlePasswordReset = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setErrors({ confirmPassword: "Senhas não coincidem" });
+      return;
+    }
+
+    const passwordValidation = userAPI.validatePassword(passwordForm.newPassword);
+    if (!passwordValidation.isValid) {
+      setErrors({ newPassword: passwordValidation.errors[0] });
+      return;
+    }
+
+    if (!userToResetPassword) return;
+
+    try {
+      await userAPI.resetPassword(userToResetPassword.user_id, {
+        newPassword: passwordForm.newPassword
+      });
+      setShowPasswordModal(false);
+      setUserToResetPassword(null);
+      setPasswordForm({ newPassword: "", confirmPassword: "" });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      setError(error instanceof Error ? error.message : 'Erro ao resetar senha');
+    }
+  };
+
+  // Stats
+  const totalUsers = pagination.total;
+  const activeUsers = users.filter(u => u.isActive).length;
+  const adminUsers = users.filter(u => u.role === 'ADMIN').length;
+  const vetUsers = users.filter(u => u.role === 'VETERINARIAN').length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-background min-h-screen">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/settings">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Link>
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
@@ -365,30 +335,50 @@ export default function UsersSettingsPage() {
         </Button>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <Card className="border-error mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 text-error">
+              <AlertTriangle className="w-5 h-5" />
+              <p>{error}</p>
+            </div>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="mt-3"
+              onClick={loadUsers}
+            >
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         {[
           {
             label: "Total de Usuários",
-            value: mockUsers.length,
+            value: totalUsers,
             icon: Users,
             color: "primary",
           },
           {
             label: "Usuários Ativos",
-            value: mockUsers.filter((u) => u.status === "active").length,
+            value: activeUsers,
             icon: CheckCircle,
             color: "success",
           },
           {
             label: "Administradores",
-            value: mockUsers.filter((u) => u.role === "admin").length,
+            value: adminUsers,
             icon: Crown,
             color: "warning",
           },
           {
             label: "Veterinários",
-            value: mockUsers.filter((u) => u.role === "veterinarian").length,
+            value: vetUsers,
             icon: UserCheck,
             color: "info",
           },
@@ -408,11 +398,7 @@ export default function UsersSettingsPage() {
                       {stat.value}
                     </p>
                   </div>
-                  <div
-                    className={`w-12 h-12 bg-${stat.color}/10 rounded-lg flex items-center justify-center`}
-                  >
-                    <stat.icon className={`w-6 h-6 text-${stat.color}`} />
-                  </div>
+                  <stat.icon className="w-8 h-8 text-primary-500" />
                 </div>
               </CardContent>
             </Card>
@@ -425,40 +411,33 @@ export default function UsersSettingsPage() {
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome ou email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="bg-surface border border-border rounded-md pl-10 pr-4 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-                />
-              </div>
+              <Input
+                placeholder="Buscar por nome ou email..."
+                value={searchTerm}
+                onChange={(e) => handleSearch(e.target.value)}
+                icon={Search}
+              />
             </div>
 
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e) => handleFilterChange('role', e.target.value)}
               className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
             >
               <option value="all">Todas as funções</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
+              <option value="ADMIN">Administrador</option>
+              <option value="VETERINARIAN">Veterinário</option>
+              <option value="RECEPTIONIST">Recepcionista</option>
             </select>
 
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
               className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
             >
               <option value="all">Todos os status</option>
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>
-              <option value="pending">Pendente</option>
             </select>
           </div>
         </CardContent>
@@ -468,176 +447,225 @@ export default function UsersSettingsPage() {
       <Card>
         <CardHeader>
           <h2 className="text-xl font-semibold text-text-primary">
-            Usuários ({filteredUsers.length})
+            Usuários ({users.length})
           </h2>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-background-secondary">
-                <tr>
-                  <th className="text-left p-4 text-sm font-medium text-text-secondary">
-                    Usuário
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-text-secondary">
-                    Função
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-text-secondary">
-                    Status
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-text-secondary">
-                    Último Login
-                  </th>
-                  <th className="text-left p-4 text-sm font-medium text-text-secondary">
-                    Criado em
-                  </th>
-                  <th className="text-right p-4 text-sm font-medium text-text-secondary">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((user, index) => {
-                  const roleInfo = getRoleInfo(user.role);
-                  const StatusIcon = getStatusIcon(user.status);
-                  const statusColor = getStatusColor(user.status);
+          {loading ? (
+            <div className="p-8 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+              <p className="text-text-secondary mt-2">Carregando usuários...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-background-secondary">
+                  <tr>
+                    <th className="text-left p-4 text-sm font-medium text-text-secondary">
+                      Usuário
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-text-secondary">
+                      Função
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-text-secondary">
+                      Status
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-text-secondary">
+                      Último Login
+                    </th>
+                    <th className="text-left p-4 text-sm font-medium text-text-secondary">
+                      Criado em
+                    </th>
+                    <th className="text-right p-4 text-sm font-medium text-text-secondary">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user, index) => {
+                    const RoleIcon = roleIcons[user.role];
 
-                  return (
-                    <motion.tr
-                      key={user.id}
-                      className="border-t border-border hover:bg-background-secondary"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <td className="p-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-primary-600" />
+                    return (
+                      <motion.tr
+                        key={user.user_id}
+                        className="border-t border-border hover:bg-background-secondary"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <td className="p-4">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-primary-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-text-primary">
+                                {user.name}
+                              </div>
+                              <div className="text-sm text-text-secondary">
+                                {user.email}
+                              </div>
+                              <div className="text-sm text-text-tertiary">
+                                {formatPhone(user.phone)}
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-medium text-text-primary">
-                              {user.name}
-                            </div>
-                            <div className="text-sm text-text-secondary">
-                              {user.email}
-                            </div>
-                            <div className="text-sm text-text-tertiary">
-                              {formatPhone(user.phone)}
-                            </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center space-x-2">
+                            <RoleIcon className="w-4 h-4 text-primary-600" />
+                            <span className="text-text-primary">
+                              {roleLabels[user.role]}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <roleInfo.icon
-                            className={`w-4 h-4 text-${roleInfo.color}-600`}
-                          />
-                          <span className="text-text-primary">
-                            {roleInfo.name}
-                          </span>
-                        </div>
-                        <div className="text-sm text-text-secondary">
-                          {roleInfo.description}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center space-x-2">
-                          <StatusIcon className={`w-4 h-4 ${statusColor}`} />
-                          <span
-                            className={`text-sm font-medium ${statusColor}`}
-                          >
-                            {user.status === "active"
-                              ? "Ativo"
-                              : user.status === "inactive"
-                                ? "Inativo"
-                                : "Pendente"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-text-primary">
-                          {formatDateTime(user.lastLogin)}
-                        </div>
-                        <div className="text-sm text-text-tertiary">
-                          {getTimeAgo(user.lastLogin)}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-text-primary">
-                          {formatDateTime(user.createdAt)}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex justify-end">
-                          <div className="relative">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                setShowUserMenu(
-                                  showUserMenu === user.id ? null : user.id,
-                                )
-                              }
-                            >
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-
-                            {showUserMenu === user.id && (
-                              <motion.div
-                                className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[180px]"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                              >
-                                <button
-                                  onClick={() => handleEdit(user)}
-                                  className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
-                                >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Editar
-                                </button>
-                                <button
-                                  onClick={() => handleStatusToggle(user)}
-                                  className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
-                                >
-                                  {user.status === "active" ? (
-                                    <>
-                                      <UserX className="w-4 h-4 mr-2" />
-                                      Desativar
-                                    </>
-                                  ) : (
-                                    <>
-                                      <UserCheck className="w-4 h-4 mr-2" />
-                                      Ativar
-                                    </>
-                                  )}
-                                </button>
-                                <hr className="my-1 border-border" />
-                                <button
-                                  onClick={() => {
-                                    setUserToDelete(user);
-                                    setShowDeleteModal(true);
-                                    setShowUserMenu(null);
-                                  }}
-                                  className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Excluir
-                                </button>
-                              </motion.div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center space-x-2">
+                            {user.isActive ? (
+                              <CheckCircle className="w-4 h-4 text-success" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-error" />
                             )}
+                            <span
+                              className={`text-sm font-medium ${user.isActive ? 'text-success' : 'text-error'}`}
+                            >
+                              {user.isActive ? "Ativo" : "Inativo"}
+                            </span>
                           </div>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="p-4">
+                          {user.lastLoginAt ? (
+                            <div>
+                              <div className="text-sm text-text-primary">
+                                {formatDateTime(user.lastLoginAt)}
+                              </div>
+                              <div className="text-sm text-text-tertiary">
+                                {getTimeAgo(user.lastLoginAt)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-text-tertiary">Nunca</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <div className="text-sm text-text-primary">
+                            {formatDateTime(user.created_at)}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex justify-end">
+                            <div className="relative">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setShowUserMenu(
+                                    showUserMenu === user.user_id ? null : user.user_id,
+                                  )
+                                }
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+
+                              {showUserMenu === user.user_id && (
+                                <motion.div
+                                  className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[180px]"
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.95 }}
+                                >
+                                  <button
+                                    onClick={() => handleEdit(user)}
+                                    className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                                  >
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setUserToResetPassword(user);
+                                      setShowPasswordModal(true);
+                                      setShowUserMenu(null);
+                                    }}
+                                    className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                                  >
+                                    <Key className="w-4 h-4 mr-2" />
+                                    Resetar Senha
+                                  </button>
+                                  <button
+                                    onClick={() => handleStatusToggle(user)}
+                                    className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                                  >
+                                    {user.isActive ? (
+                                      <>
+                                        <UserX className="w-4 h-4 mr-2" />
+                                        Desativar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="w-4 h-4 mr-2" />
+                                        Ativar
+                                      </>
+                                    )}
+                                  </button>
+                                  <hr className="my-1 border-border" />
+                                  <button
+                                    onClick={() => {
+                                      setUserToDelete(user);
+                                      setShowDeleteModal(true);
+                                      setShowUserMenu(null);
+                                    }}
+                                    className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Excluir
+                                  </button>
+                                </motion.div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm text-text-secondary">
+            Mostrando {(pagination.page - 1) * pagination.limit + 1} a{' '}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+            {pagination.total} usuários
+          </p>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              disabled={pagination.page === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-text-secondary">
+              Página {pagination.page} de {pagination.pages}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              disabled={pagination.page === pagination.pages}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* User Modal */}
       {showUserModal && (
@@ -682,9 +710,7 @@ export default function UsersSettingsPage() {
                   label="Email"
                   type="email"
                   value={userForm.email}
-                  onChange={(e) =>
-                    handleUserFormChange("email", e.target.value)
-                  }
+                  onChange={(e) => handleUserFormChange("email", e.target.value)}
                   error={errors.email}
                   required
                   icon={Mail}
@@ -695,11 +721,8 @@ export default function UsersSettingsPage() {
                 <Input
                   label="Telefone"
                   value={userForm.phone}
-                  onChange={(e) =>
-                    handleUserFormChange("phone", e.target.value)
-                  }
+                  onChange={(e) => handleUserFormChange("phone", e.target.value)}
                   error={errors.phone}
-                  required
                   icon={Phone}
                 />
 
@@ -709,35 +732,26 @@ export default function UsersSettingsPage() {
                   </label>
                   <select
                     value={userForm.role}
-                    onChange={(e) =>
-                      handleUserFormChange("role", e.target.value)
-                    }
+                    onChange={(e) => handleUserFormChange("role", e.target.value)}
                     className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
                   >
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
+                    <option value="RECEPTIONIST">Recepcionista</option>
+                    <option value="VETERINARIAN">Veterinário</option>
+                    <option value="ADMIN">Administrador</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
-                  Status
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={userForm.isActive}
+                    onChange={(e) => handleUserFormChange("isActive", e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-text-primary">Usuário ativo</span>
                 </label>
-                <select
-                  value={userForm.status}
-                  onChange={(e) =>
-                    handleUserFormChange("status", e.target.value)
-                  }
-                  className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-                >
-                  <option value="active">Ativo</option>
-                  <option value="inactive">Inativo</option>
-                  <option value="pending">Pendente</option>
-                </select>
               </div>
 
               {!editingUser && (
@@ -746,9 +760,7 @@ export default function UsersSettingsPage() {
                     label="Senha"
                     type="password"
                     value={userForm.password}
-                    onChange={(e) =>
-                      handleUserFormChange("password", e.target.value)
-                    }
+                    onChange={(e) => handleUserFormChange("password", e.target.value)}
                     error={errors.password}
                     required
                   />
@@ -757,57 +769,12 @@ export default function UsersSettingsPage() {
                     label="Confirmar Senha"
                     type="password"
                     value={userForm.confirmPassword}
-                    onChange={(e) =>
-                      handleUserFormChange("confirmPassword", e.target.value)
-                    }
+                    onChange={(e) => handleUserFormChange("confirmPassword", e.target.value)}
                     error={errors.confirmPassword}
                     required
                   />
                 </div>
               )}
-
-              {/* Permissions Preview */}
-              <div className="bg-background-secondary rounded-lg p-4">
-                <h4 className="font-medium text-text-primary mb-3">
-                  Permissões da Função
-                </h4>
-                <div className="space-y-2">
-                  {permissions.map((permission) => {
-                    const roleInfo = getRoleInfo(userForm.role);
-                    const hasPermission = roleInfo.permissions.includes(
-                      permission.id,
-                    );
-                    return (
-                      <div
-                        key={permission.id}
-                        className="flex items-center space-x-3"
-                      >
-                        <div
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                            hasPermission
-                              ? "bg-primary-500 border-primary-500"
-                              : "border-border"
-                          }`}
-                        >
-                          {hasPermission && (
-                            <CheckCircle className="w-3 h-3 text-text-inverse" />
-                          )}
-                        </div>
-                        <div>
-                          <span
-                            className={`text-sm font-medium ${hasPermission ? "text-text-primary" : "text-text-tertiary"}`}
-                          >
-                            {permission.name}
-                          </span>
-                          <p className="text-xs text-text-secondary">
-                            {permission.description}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             <div className="p-6 border-t border-border">
@@ -820,13 +787,73 @@ export default function UsersSettingsPage() {
                 </Button>
                 <Button onClick={handleSubmit} loading={isSubmitting}>
                   <Save className="w-4 h-4 mr-2" />
-                  {isSubmitting
-                    ? "Salvando..."
-                    : editingUser
-                      ? "Atualizar"
-                      : "Criar Usuário"}
+                  {editingUser ? "Atualizar" : "Criar Usuário"}
                 </Button>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Password Reset Modal */}
+      {showPasswordModal && userToResetPassword && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-neutral-900 bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowPasswordModal(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-surface rounded-lg p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                <Key className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary">
+                  Resetar Senha
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  {userToResetPassword.name}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <Input
+                label="Nova Senha"
+                type="password"
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                error={errors.newPassword}
+                required
+              />
+
+              <Input
+                label="Confirmar Senha"
+                type="password"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                error={errors.confirmPassword}
+                required
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="secondary"
+                onClick={() => setShowPasswordModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handlePasswordReset}>
+                <Key className="w-4 h-4 mr-2" />
+                Resetar Senha
+              </Button>
             </div>
           </motion.div>
         </motion.div>
@@ -873,13 +900,31 @@ export default function UsersSettingsPage() {
               >
                 Cancelar
               </Button>
-              <Button variant="error" onClick={handleDelete}>
+              <Button variant="destructive" onClick={handleDelete}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
               </Button>
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {!loading && users.length === 0 && (
+        <div className="text-center py-12">
+          <Users className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-text-primary mb-2">
+            Nenhum usuário encontrado
+          </h3>
+          <p className="text-text-secondary mb-4">
+            {searchTerm || roleFilter !== "all" || statusFilter !== "all"
+              ? "Tente ajustar os filtros de busca"
+              : "Comece criando o primeiro usuário"}
+          </p>
+          <Button onClick={() => setShowUserModal(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Usuário
+          </Button>
+        </div>
       )}
     </div>
   );

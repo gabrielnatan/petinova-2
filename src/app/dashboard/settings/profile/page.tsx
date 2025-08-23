@@ -69,9 +69,9 @@ export default function ProfileSettingsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/settings">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/settings" className="flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Link>
         </Button>

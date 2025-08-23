@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useAuth, useUI } from "@/store";
 import { useTheme } from "@/components/theme-provider";
+import { ClientOnly } from "@/components/client-only";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -249,15 +250,21 @@ function Header() {
       {/* Right Side */}
       <div className="flex items-center space-x-2">
         {/* Theme Switcher */}
-        <motion.button
-          onClick={nextTheme}
-          className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-colors duration-200"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          title={`Tema atual: ${theme}`}
+        <ClientOnly
+          fallback={
+            <div className="p-2 rounded-lg w-10 h-10 bg-background-secondary animate-pulse"></div>
+          }
         >
-          {React.createElement(themeIcons[theme], { className: "w-5 h-5" })}
-        </motion.button>
+          <motion.button
+            onClick={nextTheme}
+            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-secondary transition-colors duration-200"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={`Tema atual: ${theme}`}
+          >
+            {React.createElement(themeIcons[theme], { className: "w-5 h-5" })}
+          </motion.button>
+        </ClientOnly>
 
         {/* Notifications */}
         <motion.button

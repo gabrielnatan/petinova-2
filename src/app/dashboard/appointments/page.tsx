@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -18,6 +17,7 @@ import {
   Check,
   Stethoscope,
   Eye,
+  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,119 +31,34 @@ import {
   eachDayOfInterval,
   isToday,
   isSameDay,
+  parseISO,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
-
-// Mock data
-const mockAppointments = [
-  {
-    appointment_id: "1",
-    dateTime: new Date(2025, 0, 28, 9, 0), // Today 9:00
-    status: "confirmed",
-    notes: "Consulta de rotina - Verificação geral",
-    pet: {
-      name: "Buddy",
-      species: "Cão",
-      breed: "Golden Retriever",
-      avatarUrl: null,
-    },
-    guardian: {
-      fullName: "João Silva",
-      phone: "(11) 99999-9999",
-    },
-    veterinarian: {
-      fullName: "Dr. Maria Santos",
-      specialty: "Clínica Geral",
-    },
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-  {
-    appointment_id: "2",
-    dateTime: new Date(2025, 0, 28, 14, 30), // Today 14:30
-    status: "scheduled",
-    notes: "Vacinação V10 + Vermífugo",
-    pet: {
-      name: "Luna",
-      species: "Gato",
-      breed: "Siamês",
-      avatarUrl: null,
-    },
-    guardian: {
-      fullName: "Pedro Costa",
-      phone: "(11) 88888-8888",
-    },
-    veterinarian: {
-      fullName: "Dr. Carlos Lima",
-      specialty: "Imunização",
-    },
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-  {
-    appointment_id: "3",
-    dateTime: new Date(2025, 0, 29, 10, 0), // Tomorrow 10:00
-    status: "scheduled",
-    notes: "Procedimento cirúrgico - Castração",
-    pet: {
-      name: "Max",
-      species: "Cão",
-      breed: "Pastor Alemão",
-      avatarUrl: null,
-    },
-    guardian: {
-      fullName: "Ana Oliveira",
-      phone: "(11) 77777-7777",
-    },
-    veterinarian: {
-      fullName: "Dr. Maria Santos",
-      specialty: "Cirurgia",
-    },
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-  {
-    appointment_id: "4",
-    dateTime: new Date(2025, 0, 30, 15, 0), // Day after tomorrow 15:00
-    status: "scheduled",
-    notes: "Consulta dermatológica",
-    pet: {
-      name: "Mia",
-      species: "Gato",
-      breed: "Persa",
-      avatarUrl: null,
-    },
-    guardian: {
-      fullName: "Carlos Mendes",
-      phone: "(11) 66666-6666",
-    },
-    veterinarian: {
-      fullName: "Dr. Ana Oliveira",
-      specialty: "Dermatologia",
-    },
-    clinic_id: "1",
-    created_at: new Date(),
-  },
-];
+import { appointmentAPI, type Appointment } from "@/lib/api/appointments";
 
 const statusConfig = {
-  scheduled: {
+  SCHEDULED: {
     label: "Agendado",
     color: "bg-warning text-warning-foreground",
     icon: Clock,
   },
-  confirmed: {
+  CONFIRMED: {
     label: "Confirmado",
     color: "bg-primary-500 text-text-inverse",
     icon: Check,
   },
-  completed: {
+  IN_PROGRESS: {
+    label: "Em Andamento",
+    color: "bg-info text-info-foreground",
+    icon: Clock,
+  },
+  COMPLETED: {
     label: "Concluído",
     color: "bg-success text-success-foreground",
     icon: Check,
   },
-  cancelled: {
+  CANCELLED: {
     label: "Cancelado",
     color: "bg-error text-error-foreground",
     icon: X,
@@ -153,13 +68,15 @@ const statusConfig = {
 function AppointmentCard({
   appointment,
   onStatusChange,
+  updatingStatus
 }: {
-  appointment: any;
+  appointment: Appointment;
   onStatusChange?: (id: string, status: string) => void;
+  updatingStatus?: string | null;
 }) {
   const [showMenu, setShowMenu] = useState(false);
-  const statusInfo =
-    statusConfig[appointment.status as keyof typeof statusConfig];
+  const statusInfo = statusConfig[appointment.status as keyof typeof statusConfig];
+  const dateTime = parseISO(appointment.dateTime);
 
   const handleStatusChange = (newStatus: string) => {
     onStatusChange?.(appointment.appointment_id, newStatus);
@@ -214,46 +131,69 @@ function AppointmentCard({
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                   >
-                    <Link
-                      href={`/dashboard/appointments/${appointment.appointment_id}`}
-                      className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      asChild
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Ver Detalhes
-                    </Link>
-                    <Link
-                      href={`/dashboard/appointments/${appointment.appointment_id}/edit`}
-                      className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                      <Link
+                        href={`/dashboard/appointments/${appointment.appointment_id}`}
+                        className="flex items-center"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver Detalhes
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      asChild
                     >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Editar
-                    </Link>
-                    {appointment.status === "scheduled" && (
-                      <button
-                        onClick={() => handleStatusChange("confirmed")}
-                        className="flex items-center w-full px-3 py-2 text-sm text-primary-600 hover:bg-background-secondary"
+                      <Link
+                        href={`/dashboard/appointments/${appointment.appointment_id}/edit`}
+                        className="flex items-center"
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Editar
+                      </Link>
+                    </Button>
+                    {appointment.status === "SCHEDULED" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-primary-600 hover:bg-background-secondary"
+                        onClick={() => handleStatusChange("CONFIRMED")}
+                        disabled={updatingStatus === appointment.appointment_id}
                       >
                         <Check className="w-4 h-4 mr-2" />
                         Confirmar
-                      </button>
+                      </Button>
                     )}
-                    {appointment.status === "confirmed" && (
-                      <button
-                        onClick={() => handleStatusChange("completed")}
-                        className="flex items-center w-full px-3 py-2 text-sm text-success hover:bg-background-secondary"
+                    {appointment.status === "CONFIRMED" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-success hover:bg-background-secondary"
+                        onClick={() => handleStatusChange("COMPLETED")}
+                        disabled={updatingStatus === appointment.appointment_id}
                       >
                         <Check className="w-4 h-4 mr-2" />
                         Marcar como Concluído
-                      </button>
+                      </Button>
                     )}
                     <hr className="my-1 border-border" />
-                    <button
-                      onClick={() => handleStatusChange("cancelled")}
-                      className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-error hover:bg-background-secondary"
+                      onClick={() => handleStatusChange("CANCELLED")}
+                      disabled={updatingStatus === appointment.appointment_id}
                     >
                       <X className="w-4 h-4 mr-2" />
                       Cancelar
-                    </button>
+                    </Button>
                   </motion.div>
                 )}
               </div>
@@ -263,25 +203,27 @@ function AppointmentCard({
           <div className="space-y-2 mb-3">
             <div className="flex items-center text-sm text-text-secondary">
               <Clock className="w-4 h-4 mr-2" />
-              {format(appointment.dateTime, "HH:mm", { locale: ptBR })}
+              {format(dateTime, "HH:mm", { locale: ptBR })}
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <User className="w-4 h-4 mr-2" />
-              {appointment.guardian.fullName}
+              {appointment.guardian.name}
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Stethoscope className="w-4 h-4 mr-2" />
-              {appointment.veterinarian.fullName}
+              {appointment.veterinarian.name}
             </div>
           </div>
 
           <div className="bg-background-secondary rounded-md p-3">
             <p className="text-sm text-text-primary font-medium mb-1">
-              {appointment.veterinarian.specialty}
+              {appointment.veterinarian.specialty || 'Clínica Geral'}
             </p>
-            <p className="text-sm text-text-secondary line-clamp-2">
-              {appointment.notes}
-            </p>
+            {appointment.notes && (
+              <p className="text-sm text-text-secondary line-clamp-2">
+                {appointment.notes}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -292,9 +234,11 @@ function AppointmentCard({
 function WeeklyCalendar({
   selectedDate,
   onDateChange,
+  appointments,
 }: {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  appointments: Appointment[];
 }) {
   const weekStart = startOfWeek(selectedDate, { locale: ptBR });
   const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
@@ -303,8 +247,8 @@ function WeeklyCalendar({
   return (
     <div className="grid grid-cols-7 gap-2">
       {days.map((day) => {
-        const dayAppointments = mockAppointments.filter((app) =>
-          isSameDay(app.dateTime, day),
+        const dayAppointments = appointments.filter((app) =>
+          isSameDay(parseISO(app.dateTime), day)
         );
         const isCurrentDay = isToday(day);
         const isSelected = isSameDay(day, selectedDate);
@@ -317,8 +261,8 @@ function WeeklyCalendar({
               isSelected
                 ? "bg-primary-500 text-text-inverse border-primary-500 shadow-md"
                 : isCurrentDay
-                  ? "bg-primary-50 text-primary-700 border-primary-200"
-                  : "bg-surface border-border hover:bg-background-secondary hover:border-primary-300"
+                ? "bg-primary-50 text-primary-700 border-primary-200"
+                : "bg-surface border-border hover:bg-background-secondary hover:border-primary-300"
             }`}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -338,14 +282,16 @@ function WeeklyCalendar({
                   }`}
                 >
                   <div className="font-medium">
-                    {format(app.dateTime, "HH:mm")}
+                    {format(parseISO(app.dateTime), "HH:mm")}
                   </div>
                   <div className="truncate opacity-90">{app.pet.name}</div>
                 </div>
               ))}
               {dayAppointments.length > 3 && (
                 <div
-                  className={`text-xs ${isSelected ? "text-white/75" : "text-text-tertiary"}`}
+                  className={`text-xs ${
+                    isSelected ? "text-white/75" : "text-text-tertiary"
+                  }`}
                 >
                   +{dayAppointments.length - 3} mais
                 </div>
@@ -362,28 +308,63 @@ export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
-  const dayAppointments = mockAppointments
-    .filter((app) => isSameDay(app.dateTime, selectedDate))
-    .sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime());
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Carregar agendamentos da semana atual para o calendário
+      const weekStart = startOfWeek(selectedDate, { locale: ptBR });
+      const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
+      
+      const response = await appointmentAPI.getAppointmentsByWeek(
+        format(weekStart, 'yyyy-MM-dd'),
+        format(weekEnd, 'yyyy-MM-dd')
+      );
+      
+      setAppointments(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar agendamentos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAppointments();
+  }, [selectedDate]);
+
+  const dayAppointments = appointments
+    .filter((app) => isSameDay(parseISO(app.dateTime), selectedDate))
+    .sort((a, b) => parseISO(a.dateTime).getTime() - parseISO(b.dateTime).getTime());
 
   const filteredAppointments = dayAppointments.filter((app) => {
     const matchesSearch =
       searchTerm === "" ||
       app.pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.guardian.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.veterinarian.fullName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      app.guardian.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.veterinarian.name.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === "all" || app.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (appointmentId: string, newStatus: string) => {
-    // In real app, this would update the appointment status via API
-    console.log(`Updating appointment ${appointmentId} to status ${newStatus}`);
+  const handleStatusChange = async (appointmentId: string, newStatus: string) => {
+    try {
+      setUpdatingStatus(appointmentId);
+      await appointmentAPI.updateAppointmentStatus(appointmentId, newStatus as any);
+      await loadAppointments();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao atualizar status');
+    } finally {
+      setUpdatingStatus(null);
+    }
   };
 
   const getStatusCount = (status: string) => {
@@ -400,8 +381,8 @@ export default function AppointmentsPage() {
             Gerencie os agendamentos da clínica
           </p>
         </div>
-        <Button>
-          <Link href="/dashboard/appointments/new">
+        <Button asChild>
+          <Link href="/dashboard/appointments/new" className="flex items-center">
             <Plus className="w-4 h-4 mr-2" />
             Novo Agendamento
           </Link>
@@ -443,10 +424,22 @@ export default function AppointmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <WeeklyCalendar
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-          />
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <div className="text-error mb-4">{error}</div>
+              <Button onClick={loadAppointments}>Tentar novamente</Button>
+            </div>
+          ) : (
+            <WeeklyCalendar
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              appointments={appointments}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -478,10 +471,11 @@ export default function AppointmentsPage() {
                 className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
               >
                 <option value="all">Todos</option>
-                <option value="scheduled">Agendados</option>
-                <option value="confirmed">Confirmados</option>
-                <option value="completed">Concluídos</option>
-                <option value="cancelled">Cancelados</option>
+                <option value="SCHEDULED">Agendados</option>
+                <option value="CONFIRMED">Confirmados</option>
+                <option value="IN_PROGRESS">Em Andamento</option>
+                <option value="COMPLETED">Concluídos</option>
+                <option value="CANCELLED">Cancelados</option>
               </select>
             </div>
           </div>
@@ -501,8 +495,8 @@ export default function AppointmentsPage() {
                     ? "Tente ajustar os filtros de busca"
                     : "Que tal agendar a primeira consulta do dia?"}
                 </p>
-                <Button>
-                  <Link href="/dashboard/appointments/new">
+                <Button asChild>
+                  <Link href="/dashboard/appointments/new" className="flex items-center">
                     <Plus className="w-4 h-4 mr-2" />
                     Agendar Consulta
                   </Link>
@@ -521,6 +515,7 @@ export default function AppointmentsPage() {
                   <AppointmentCard
                     appointment={appointment}
                     onStatusChange={handleStatusChange}
+                    updatingStatus={updatingStatus}
                   />
                 </motion.div>
               ))}
@@ -549,48 +544,40 @@ export default function AppointmentsPage() {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-warning rounded-full"></div>
-                    <span className="text-sm text-text-secondary">
-                      Agendados
-                    </span>
+                    <span className="text-sm text-text-secondary">Agendados</span>
                   </div>
                   <span className="text-sm font-medium text-text-primary">
-                    {getStatusCount("scheduled")}
+                    {getStatusCount("SCHEDULED")}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-primary-500 rounded-full"></div>
-                    <span className="text-sm text-text-secondary">
-                      Confirmados
-                    </span>
+                    <span className="text-sm text-text-secondary">Confirmados</span>
                   </div>
                   <span className="text-sm font-medium text-text-primary">
-                    {getStatusCount("confirmed")}
+                    {getStatusCount("CONFIRMED")}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-success rounded-full"></div>
-                    <span className="text-sm text-text-secondary">
-                      Concluídos
-                    </span>
+                    <span className="text-sm text-text-secondary">Concluídos</span>
                   </div>
                   <span className="text-sm font-medium text-text-primary">
-                    {getStatusCount("completed")}
+                    {getStatusCount("COMPLETED")}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-error rounded-full"></div>
-                    <span className="text-sm text-text-secondary">
-                      Cancelados
-                    </span>
+                    <span className="text-sm text-text-secondary">Cancelados</span>
                   </div>
                   <span className="text-sm font-medium text-text-primary">
-                    {getStatusCount("cancelled")}
+                    {getStatusCount("CANCELLED")}
                   </span>
                 </div>
               </div>
@@ -605,22 +592,22 @@ export default function AppointmentsPage() {
               </h3>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full">
-                <Link href="/dashboard/appointments/new">
+              <Button className="w-full" asChild>
+                <Link href="/dashboard/appointments/new" className="flex items-center justify-center">
                   <Plus className="w-4 h-4 mr-2" />
                   Novo Agendamento
                 </Link>
               </Button>
 
-              <Button variant="secondary" className="w-full">
-                <Link href="/dashboard/pets">
+              <Button variant="secondary" className="w-full" asChild>
+                <Link href="/dashboard/pets" className="flex items-center justify-center">
                   <Heart className="w-4 h-4 mr-2" />
                   Ver Pets
                 </Link>
               </Button>
 
-              <Button variant="secondary" className="w-full">
-                <Link href="/dashboard/guardians">
+              <Button variant="secondary" className="w-full" asChild>
+                <Link href="/dashboard/guardians" className="flex items-center justify-center">
                   <User className="w-4 h-4 mr-2" />
                   Ver Tutores
                 </Link>
@@ -637,8 +624,8 @@ export default function AppointmentsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockAppointments
-                  .filter((app) => app.dateTime > selectedDate)
+                {appointments
+                  .filter((app) => parseISO(app.dateTime) > selectedDate)
                   .slice(0, 3)
                   .map((appointment) => (
                     <div
@@ -653,8 +640,8 @@ export default function AppointmentsPage() {
                           {appointment.pet.name}
                         </p>
                         <p className="text-xs text-text-secondary">
-                          {format(appointment.dateTime, "dd/MM HH:mm")} •{" "}
-                          {appointment.guardian.fullName}
+                          {format(parseISO(appointment.dateTime), "dd/MM HH:mm")} •{" "}
+                          {appointment.guardian.name}
                         </p>
                       </div>
                     </div>

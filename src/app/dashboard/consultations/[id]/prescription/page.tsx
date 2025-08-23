@@ -252,8 +252,8 @@ OBSERVAÇÕES LEGAIS:
           className={`flex items-center justify-between mb-6 ${isFullscreen ? "p-6 pb-0" : ""} no-print`}
         >
           <div className="flex items-center space-x-4">
-            <Button variant="ghost">
-              <Link href={`/dashboard/consultations/${appointmentId}`}>
+            <Button variant="ghost" asChild>
+              <Link href={`/dashboard/consultations/${appointmentId}`} className="flex items-center">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Voltar para Consulta
               </Link>
@@ -781,33 +781,35 @@ OBSERVAÇÕES LEGAIS:
                   </h3>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button variant="ghost" className="w-full justify-start">
-                    <Link href={`/dashboard/consultations/${appointmentId}`}>
+                  <Button variant="ghost" className="w-full justify-start" asChild>
+                    <Link href={`/dashboard/consultations/${appointmentId}`} className="flex items-center">
                       <FileText className="w-4 h-4 mr-2" />
                       Ver Consulta Completa
                     </Link>
                   </Button>
 
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant="ghost" className="w-full justify-start" asChild>
                     <Link
                       href={`/dashboard/pets/${mockPrescription.consultation.pet.pet_id}`}
+                      className="flex items-center"
                     >
                       <Heart className="w-4 h-4 mr-2" />
                       Perfil do Pet
                     </Link>
                   </Button>
 
-                  <Button variant="ghost" className="w-full justify-start">
+                  <Button variant="ghost" className="w-full justify-start" asChild>
                     <Link
                       href={`/dashboard/guardians/${mockPrescription.consultation.guardian.guardian_id}`}
+                      className="flex items-center"
                     >
                       <User className="w-4 h-4 mr-2" />
                       Perfil do Tutor
                     </Link>
                   </Button>
 
-                  <Button variant="ghost" className="w-full justify-start">
-                    <Link href="/dashboard/appointments/new">
+                  <Button variant="ghost" className="w-full justify-start" asChild>
+                    <Link href="/dashboard/appointments/new" className="flex items-center">
                       <Calendar className="w-4 h-4 mr-2" />
                       Agendar Retorno
                     </Link>

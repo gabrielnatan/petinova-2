@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -18,86 +17,37 @@ import {
   Trash2,
   Clock,
   Star,
+  ChevronLeft,
+  ChevronRight,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import { veterinarianAPI, type Veterinarian } from "@/lib/api/veterinarians";
 
-// Mock data
-const mockVeterinarians = [
-  {
-    veterinarian_id: "1",
-    fullName: "Dra. Maria Santos",
-    crmv: {
-      number: "12345",
-      state: "SP",
-      issueDate: new Date("2018-01-15"),
-      expirationDate: new Date("2025-12-31"),
-    },
-    email: "maria.santos@clinica.com",
-    phoneNumber: "(11) 99999-1111",
-    avatarUrl: null,
-    yearsOfExperience: 8,
-    specialties: ["Clínica Geral", "Cirurgia", "Cardiologia"],
-    availabilitySchedule: ["Segunda", "Terça", "Quarta", "Quinta"],
-    stats: {
-      totalConsultations: 1245,
-      thisMonth: 89,
-      avgRating: 4.8,
-      nextAppointment: new Date(2025, 0, 28, 9, 0),
-    },
-    created_at: new Date("2023-03-15"),
-  },
-  {
-    veterinarian_id: "2",
-    fullName: "Dr. Carlos Lima",
-    crmv: {
-      number: "67890",
-      state: "SP",
-      issueDate: new Date("2015-06-20"),
-      expirationDate: new Date("2025-12-31"),
-    },
-    email: "carlos.lima@clinica.com",
-    phoneNumber: "(11) 88888-2222",
-    avatarUrl: null,
-    yearsOfExperience: 12,
-    specialties: ["Dermatologia", "Endocrinologia", "Neurologia"],
-    availabilitySchedule: ["Terça", "Quarta", "Quinta", "Sexta"],
-    stats: {
-      totalConsultations: 2103,
-      thisMonth: 67,
-      avgRating: 4.9,
-      nextAppointment: new Date(2025, 0, 28, 14, 30),
-    },
-    created_at: new Date("2022-08-10"),
-  },
-  {
-    veterinarian_id: "3",
-    fullName: "Dra. Ana Oliveira",
-    crmv: {
-      number: "11223",
-      state: "SP",
-      issueDate: new Date("2020-09-10"),
-      expirationDate: new Date("2025-12-31"),
-    },
-    email: "ana.oliveira@clinica.com",
-    phoneNumber: "(11) 77777-3333",
-    avatarUrl: null,
-    yearsOfExperience: 5,
-    specialties: ["Oftalmologia", "Odontologia", "Fisioterapia"],
-    availabilitySchedule: ["Segunda", "Quarta", "Sexta", "Sábado"],
-    stats: {
-      totalConsultations: 876,
-      thisMonth: 52,
-      avgRating: 4.7,
-      nextAppointment: new Date(2025, 0, 29, 10, 0),
-    },
-    created_at: new Date("2023-11-05"),
-  },
-];
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
-function VeterinarianCard({ veterinarian }: { veterinarian: any }) {
+function VeterinarianCard({ 
+  veterinarian, 
+  onDelete, 
+  onToggleStatus, 
+  deleting,
+  togglingStatus 
+}: { 
+  veterinarian: Veterinarian;
+  onDelete: (id: string, name: string) => void;
+  onToggleStatus: (id: string, name: string, currentStatus: boolean) => void;
+  deleting: boolean;
+  togglingStatus: boolean;
+}) {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -107,17 +57,30 @@ function VeterinarianCard({ veterinarian }: { veterinarian: any }) {
       whileHover={{ y: -5 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="hover:shadow-lg transition-shadow duration-200">
+      <Card className={`hover:shadow-lg transition-shadow duration-200 ${
+        !veterinarian.isActive ? 'opacity-60 border-dashed' : ''
+      }`}>
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                <Stethoscope className="w-6 h-6 text-primary-600" />
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                veterinarian.isActive ? 'bg-primary-100' : 'bg-gray-100'
+              }`}>
+                <Stethoscope className={`w-6 h-6 ${
+                  veterinarian.isActive ? 'text-primary-600' : 'text-gray-400'
+                }`} />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-text-primary">
-                  {veterinarian.fullName}
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg font-semibold text-text-primary">
+                    {veterinarian.fullName}
+                  </h3>
+                  {!veterinarian.isActive && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                      Inativo
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-text-secondary">
                   CRMV {veterinarian.crmv.number}/{veterinarian.crmv.state}
                 </p>
@@ -141,24 +104,63 @@ function VeterinarianCard({ veterinarian }: { veterinarian: any }) {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                 >
-                  <Link
-                    href={`/dashboard/veterinarians/${veterinarian.veterinarian_id}`}
-                    className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link
+                      href={`/dashboard/veterinarians/${veterinarian.veterinarian_id}`}
+                      className="flex items-center"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Ver Perfil
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link
+                      href={`/dashboard/veterinarians/${veterinarian.veterinarian_id}/edit`}
+                      className="flex items-center"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`w-full justify-start ${
+                      veterinarian.isActive 
+                        ? 'text-warning hover:bg-warning/10' 
+                        : 'text-success hover:bg-success/10'
+                    }`}
+                    onClick={() => onToggleStatus(
+                      veterinarian.veterinarian_id, 
+                      veterinarian.fullName, 
+                      veterinarian.isActive
+                    )}
+                    disabled={togglingStatus}
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Ver Perfil
-                  </Link>
-                  <Link
-                    href={`/dashboard/veterinarians/${veterinarian.veterinarian_id}/edit`}
-                    className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                    {togglingStatus ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                    ) : veterinarian.isActive ? (
+                      <UserX className="w-4 h-4 mr-2" />
+                    ) : (
+                      <UserCheck className="w-4 h-4 mr-2" />
+                    )}
+                    {veterinarian.isActive ? 'Desativar' : 'Ativar'}
+                  </Button>
+                  <hr className="my-1 border-border" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-error hover:bg-error/10"
+                    onClick={() => onDelete(veterinarian.veterinarian_id, veterinarian.fullName)}
+                    disabled={deleting}
                   >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Editar
-                  </Link>
-                  <button className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir
-                  </button>
+                    {deleting ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-error mr-2"></div>
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    {deleting ? 'Excluindo...' : 'Excluir'}
+                  </Button>
                 </motion.div>
               )}
             </div>
@@ -176,66 +178,56 @@ function VeterinarianCard({ veterinarian }: { veterinarian: any }) {
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Award className="w-4 h-4 mr-2" />
-              {veterinarian.yearsOfExperience} anos de experiência
+              {veterinarian.yearsOfExperience || 0} anos de experiência
             </div>
           </div>
 
           {/* Specialties */}
-          <div className="mb-4">
-            <p className="text-sm font-medium text-text-primary mb-2">
-              Especialidades:
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {veterinarian.specialties.map(
-                (specialty: string, index: number) => (
-                  <span
-                    key={index}
-                    className="px-2 py-1 bg-secondary-100 text-secondary-700 text-xs rounded-full"
-                  >
-                    {specialty}
-                  </span>
-                ),
-              )}
+          {veterinarian.specialty && (
+            <div className="mb-4">
+              <p className="text-sm font-medium text-text-primary mb-2">
+                Especialidade:
+              </p>
+              <span className="px-2 py-1 bg-secondary-100 text-secondary-700 text-xs rounded-full">
+                {veterinarian.specialty}
+              </span>
             </div>
-          </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="text-center p-2 bg-background-secondary rounded-md">
               <p className="text-lg font-bold text-text-primary">
-                {veterinarian.stats.thisMonth}
+                {veterinarian.stats?.todayAppointments || 0}
               </p>
-              <p className="text-xs text-text-secondary">Consultas este mês</p>
+              <p className="text-xs text-text-secondary">Consultas hoje</p>
             </div>
             <div className="text-center p-2 bg-background-secondary rounded-md">
-              <div className="flex items-center justify-center space-x-1">
-                <Star className="w-4 h-4 text-warning fill-current" />
-                <p className="text-lg font-bold text-text-primary">
-                  {veterinarian.stats.avgRating}
-                </p>
-              </div>
-              <p className="text-xs text-text-secondary">Avaliação média</p>
+              <p className="text-lg font-bold text-text-primary">
+                {veterinarian.stats?.totalConsultations || 0}
+              </p>
+              <p className="text-xs text-text-secondary">Total consultas</p>
             </div>
           </div>
 
           {/* Availability */}
-          <div className="border-t border-border pt-3">
-            <p className="text-sm font-medium text-text-primary mb-2">
-              Disponibilidade:
-            </p>
-            <div className="flex flex-wrap gap-1">
-              {veterinarian.availabilitySchedule.map(
-                (day: string, index: number) => (
+          {veterinarian.availabilitySchedule && veterinarian.availabilitySchedule.length > 0 && (
+            <div className="border-t border-border pt-3">
+              <p className="text-sm font-medium text-text-primary mb-2">
+                Disponibilidade:
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {veterinarian.availabilitySchedule.map((day: string, index: number) => (
                   <span
                     key={index}
                     className="px-2 py-1 bg-accent-100 text-accent-700 text-xs rounded"
                   >
                     {day}
                   </span>
-                ),
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>
@@ -245,25 +237,109 @@ function VeterinarianCard({ veterinarian }: { veterinarian: any }) {
 export default function VeterinariansListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 9,
+    total: 0,
+    pages: 0
+  });
+  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
+  // Extract unique specialties for filter
   const allSpecialties = Array.from(
-    new Set(mockVeterinarians.flatMap((vet) => vet.specialties)),
+    new Set(veterinarians.map(vet => vet.specialty).filter(Boolean))
   );
 
-  const filteredVeterinarians = mockVeterinarians.filter((vet) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      vet.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vet.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vet.specialties.some((spec) =>
-        spec.toLowerCase().includes(searchTerm.toLowerCase()),
-      );
+  const loadVeterinarians = async (page = 1, search = "", specialty = "all", status = "all") => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params: any = {
+        page,
+        limit: 9,
+        search: search.trim() || undefined,
+      };
+      
+      if (specialty !== "all") params.specialty = specialty;
+      if (status !== "all") params.isActive = status === "active";
+      
+      const response = await veterinarianAPI.getVeterinarians(params);
+      setVeterinarians(response.veterinarians);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar veterinários');
+      setVeterinarians([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const matchesSpecialty =
-      specialtyFilter === "all" || vet.specialties.includes(specialtyFilter);
+  useEffect(() => {
+    loadVeterinarians(1);
+  }, []);
 
-    return matchesSearch && matchesSpecialty;
-  });
+  useEffect(() => {
+    if (searchDebounce) {
+      clearTimeout(searchDebounce);
+    }
+
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      loadVeterinarians(1, searchTerm, specialtyFilter, statusFilter);
+    }, 500);
+
+    setSearchDebounce(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchTerm, specialtyFilter, statusFilter]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    loadVeterinarians(page, searchTerm, specialtyFilter, statusFilter);
+  };
+
+  const handleDelete = async (veterinarianId: string, veterinarianName: string) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o veterinário ${veterinarianName}?`)) {
+      return;
+    }
+
+    try {
+      setDeleting(veterinarianId);
+      await veterinarianAPI.deleteVeterinarian(veterinarianId);
+      await loadVeterinarians(currentPage, searchTerm, specialtyFilter, statusFilter);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao excluir veterinário');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleToggleStatus = async (veterinarianId: string, veterinarianName: string, currentStatus: boolean) => {
+    const action = currentStatus ? 'desativar' : 'ativar';
+    if (!window.confirm(`Tem certeza que deseja ${action} o veterinário ${veterinarianName}?`)) {
+      return;
+    }
+
+    try {
+      setTogglingStatus(veterinarianId);
+      await veterinarianAPI.toggleVeterinarianStatus(veterinarianId, !currentStatus);
+      await loadVeterinarians(currentPage, searchTerm, specialtyFilter, statusFilter);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : `Erro ao ${action} veterinário`);
+    } finally {
+      setTogglingStatus(null);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -275,8 +351,8 @@ export default function VeterinariansListPage() {
             Gerencie a equipe de veterinários da clínica
           </p>
         </div>
-        <Button>
-          <Link href="/dashboard/veterinarians/new">
+        <Button asChild>
+          <Link href="/dashboard/veterinarians/new" className="flex items-center">
             <Plus className="w-4 h-4 mr-2" />
             Novo Veterinário
           </Link>
@@ -307,7 +383,17 @@ export default function VeterinariansListPage() {
           ))}
         </select>
 
-        <Button variant="secondary">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
+        >
+          <option value="all">Todos os status</option>
+          <option value="active">Ativos</option>
+          <option value="inactive">Inativos</option>
+        </select>
+
+        <Button variant="secondary" className="flex items-center">
           <Filter className="w-4 h-4 mr-2" />
           Mais Filtros
         </Button>
@@ -319,11 +405,9 @@ export default function VeterinariansListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">
-                  Total de Veterinários
-                </p>
+                <p className="text-sm text-text-secondary">Total de Veterinários</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockVeterinarians.length}
+                  {pagination.total}
                 </p>
               </div>
               <Stethoscope className="w-8 h-8 text-primary-500" />
@@ -335,8 +419,24 @@ export default function VeterinariansListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
+                <p className="text-sm text-text-secondary">Ativos</p>
+                <p className="text-2xl font-bold text-text-primary">
+                  {veterinarians.filter(v => v.isActive).length}
+                </p>
+              </div>
+              <UserCheck className="w-8 h-8 text-success" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
                 <p className="text-sm text-text-secondary">Consultas Hoje</p>
-                <p className="text-2xl font-bold text-text-primary">15</p>
+                <p className="text-2xl font-bold text-text-primary">
+                  {veterinarians.reduce((sum, v) => sum + (v.stats?.todayAppointments || 0), 0)}
+                </p>
               </div>
               <Calendar className="w-8 h-8 text-secondary-500" />
             </div>
@@ -347,23 +447,10 @@ export default function VeterinariansListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">Disponíveis Agora</p>
-                <p className="text-2xl font-bold text-text-primary">2</p>
-              </div>
-              <Clock className="w-8 h-8 text-success" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-text-secondary">Avaliação Média</p>
-                <div className="flex items-center space-x-1">
-                  <Star className="w-5 h-5 text-warning fill-current" />
-                  <p className="text-2xl font-bold text-text-primary">4.8</p>
-                </div>
+                <p className="text-sm text-text-secondary">Especialidades</p>
+                <p className="text-2xl font-bold text-text-primary">
+                  {allSpecialties.length}
+                </p>
               </div>
               <Award className="w-8 h-8 text-accent-500" />
             </div>
@@ -372,32 +459,104 @@ export default function VeterinariansListPage() {
       </div>
 
       {/* Veterinarians Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVeterinarians.map((veterinarian, index) => (
-          <motion.div
-            key={veterinarian.veterinarian_id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <VeterinarianCard veterinarian={veterinarian} />
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>
+            <p className="text-text-secondary">Carregando veterinários...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12">
+          <div className="text-error mb-4">{error}</div>
+          <Button onClick={() => loadVeterinarians(currentPage, searchTerm, specialtyFilter, statusFilter)}>
+            Tentar novamente
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {veterinarians.map((veterinarian, index) => (
+              <motion.div
+                key={veterinarian.veterinarian_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <VeterinarianCard 
+                  veterinarian={veterinarian} 
+                  onDelete={handleDelete}
+                  onToggleStatus={handleToggleStatus}
+                  deleting={deleting === veterinarian.veterinarian_id}
+                  togglingStatus={togglingStatus === veterinarian.veterinarian_id}
+                />
+              </motion.div>
+            ))}
+          </div>
 
-      {filteredVeterinarians.length === 0 && (
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <div className="text-sm text-text-secondary">
+                Mostrando {((currentPage - 1) * pagination.limit) + 1} até {Math.min(currentPage * pagination.limit, pagination.total)} de {pagination.total} veterinários
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1 || loading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </Button>
+                
+                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                  const page = i + Math.max(1, currentPage - 2);
+                  if (page > pagination.pages) return null;
+                  
+                  return (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handlePageChange(page)}
+                      disabled={loading}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= pagination.pages || loading}
+                >
+                  Próximo
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!loading && !error && veterinarians.length === 0 && (
         <div className="text-center py-12">
           <Stethoscope className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
-            Nenhum veterinário encontrado
+            {searchTerm || specialtyFilter !== "all" || statusFilter !== "all"
+              ? "Nenhum veterinário encontrado"
+              : "Nenhum veterinário cadastrado"}
           </h3>
           <p className="text-text-secondary mb-4">
-            {searchTerm || specialtyFilter !== "all"
+            {searchTerm || specialtyFilter !== "all" || statusFilter !== "all"
               ? "Tente ajustar sua busca"
               : "Comece cadastrando o primeiro veterinário"}
           </p>
-          <Button>
-            <Link href="/dashboard/veterinarians/new">
+          <Button asChild>
+            <Link href="/dashboard/veterinarians/new" className="flex items-center">
               <Plus className="w-4 h-4 mr-2" />
               Cadastrar Veterinário
             </Link>

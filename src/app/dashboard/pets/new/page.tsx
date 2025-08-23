@@ -1,17 +1,30 @@
 //@ts-nocheck
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { petSchema, type PetFormData } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+interface Guardian {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
 
 export default function NewPetPage() {
+  const router = useRouter();
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [loadingGuardians, setLoadingGuardians] = useState(true);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -26,15 +39,63 @@ export default function NewPetPage() {
     },
   });
 
+  useEffect(() => {
+    const fetchGuardians = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        const response = await fetch("/api/guardians", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setGuardians(data.guardians);
+        }
+      } catch (error) {
+        console.error("Error fetching guardians:", error);
+      } finally {
+        setLoadingGuardians(false);
+      }
+    };
+
+    fetchGuardians();
+  }, []);
+
   const onSubmit = async (data: PetFormData) => {
+    setSubmitError(null);
     try {
-      console.log("Pet data:", data);
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      // Redirect to pets list
-      window.location.href = "/dashboard/pets";
+      const token = localStorage.getItem("accessToken");
+      const response = await fetch("/api/pets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: data.name,
+          species: data.species,
+          breed: data.breed,
+          size: data.size,
+          weight: data.weight,
+          isNeutered: data.isNeutered,
+          environment: data.environment,
+          birthDate: data.birthDate?.toISOString(),
+          notes: data.notes,
+          guardianId: data.guardian_id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao criar pet");
+      }
+
+      router.push("/dashboard/pets");
     } catch (error) {
       console.error("Error creating pet:", error);
+      setSubmitError(error instanceof Error ? error.message : "Erro desconhecido");
     }
   };
 
@@ -42,9 +103,9 @@ export default function NewPetPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/pets">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/pets" className="flex items-center gap-2">
+            <ArrowLeft className="w-4 h-4" />
             Voltar
           </Link>
         </Button>
@@ -219,28 +280,57 @@ export default function NewPetPage() {
               <select
                 {...register("guardian_id")}
                 className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
+                disabled={loadingGuardians}
               >
-                <option value="">Selecione o tutor</option>
-                <option value="1">João Silva - (11) 99999-9999</option>
-                <option value="2">Maria Santos - (11) 88888-8888</option>
+                <option value="">
+                  {loadingGuardians ? "Carregando..." : "Selecione o tutor"}
+                </option>
+                {guardians.map((guardian) => (
+                  <option key={guardian.id} value={guardian.id}>
+                    {guardian.name} - {guardian.phone || guardian.email}
+                  </option>
+                ))}
               </select>
               {errors.guardian_id && (
                 <p className="text-sm text-error mt-1">
                   {errors.guardian_id.message}
                 </p>
               )}
+              {guardians.length === 0 && !loadingGuardians && (
+                <p className="text-sm text-text-secondary mt-1">
+                  Nenhum tutor encontrado. Cadastre um tutor primeiro.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
 
+        {/* Error Display */}
+        {submitError && (
+          <Card className="border-error">
+            <CardContent className="p-4">
+              <p className="text-error text-sm">{submitError}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Actions */}
         <div className="flex justify-end space-x-4">
-          <Button variant="secondary">
-            <Link href="/dashboard/pets">Cancelar</Link>
+          <Button variant="secondary" asChild>
+            <Link href="/dashboard/pets" className="flex items-center justify-center">Cancelar</Link>
           </Button>
-          <Button type="submit" loading={isSubmitting}>
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Pet
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Pet
+              </>
+            )}
           </Button>
         </div>
       </form>

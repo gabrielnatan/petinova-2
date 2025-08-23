@@ -239,8 +239,8 @@ export default function EditProductPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/inventory">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>
@@ -570,14 +570,14 @@ export default function EditProductPage() {
                   {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
 
-                <Button variant="secondary" className="w-full">
-                  <Link href="/dashboard/inventory">Cancelar Edição</Link>
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href="/dashboard/inventory" className="flex items-center justify-center">Cancelar Edição</Link>
                 </Button>
 
                 <hr className="border-border" />
 
-                <Button variant="secondary" className="w-full">
-                  <Link href={`/dashboard/inventory/${appointmentId}`}>
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href={`/dashboard/inventory/${appointmentId}`} className="flex items-center justify-center">
                     <Eye className="w-4 h-4 mr-2" />
                     Ver Detalhes
                   </Link>
@@ -707,8 +707,8 @@ export default function EditProductPage() {
                   ))}
                 </div>
 
-                <Button variant="ghost" className="w-full mt-3">
-                  <Link href="/dashboard/inventory/movements">
+                <Button variant="ghost" className="w-full mt-3" asChild>
+                  <Link href="/dashboard/inventory/movements" className="flex items-center justify-center">
                     <BarChart3 className="w-4 h-4 mr-2" />
                     Ver Todas Movimentações
                   </Link>

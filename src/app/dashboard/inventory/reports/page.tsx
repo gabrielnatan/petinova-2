@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -17,108 +16,160 @@ import {
   DollarSign,
   AlertTriangle,
   Printer,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { useAuth } from "@/store";
 
-// Mock data for reports
-const inventoryReports = {
+interface ReportData {
   summary: {
-    totalProducts: 128,
-    totalValue: 45620.5,
-    lowStockItems: 12,
-    expiredItems: 3,
-    expiringItems: 8,
-    avgTurnover: 2.4,
-    monthlyGrowth: 8.5,
-  },
-
-  categoryAnalysis: [
-    {
-      category: "Medicamentos",
-      products: 45,
-      value: 18750.0,
-      percentage: 41.1,
-    },
-    { category: "Alimentos", products: 32, value: 15230.0, percentage: 33.4 },
-    { category: "Higiene", products: 28, value: 8940.5, percentage: 19.6 },
-    { category: "Acessórios", products: 23, value: 2700.0, percentage: 5.9 },
-  ],
-
-  topProducts: [
-    {
-      name: "Ração Premium Cães Adultos",
-      movement: 156,
-      revenue: 14040.4,
-      margin: 45.2,
-    },
-    { name: "Vacina V10 Canina", movement: 89, revenue: 5785.0, margin: 57.7 },
-    { name: "Shampoo Antipulgas", movement: 67, revenue: 2338.3, margin: 54.4 },
-    {
-      name: "Antibiótico Amoxicilina",
-      movement: 45,
-      revenue: 400.5,
-      margin: 71.2,
-    },
-    {
-      name: "Brinquedo Corda Dental",
-      movement: 34,
-      revenue: 846.6,
-      margin: 65.9,
-    },
-  ],
-
-  lowStockAlert: [
-    {
-      name: "Antibiótico Amoxicilina",
-      current: 3,
-      minimum: 20,
-      status: "critical",
-    },
-    { name: "Vacina V8 Felina", current: 5, minimum: 15, status: "critical" },
-    { name: "Soro Fisiológico", current: 8, minimum: 25, status: "low" },
-    { name: "Luvas Procedimento", current: 12, minimum: 30, status: "low" },
-  ],
-
-  expiryAlert: [
-    {
-      name: "Antibiótico Cefalexina",
-      expiry: new Date("2025-02-15"),
-      daysLeft: 18,
-    },
-    {
-      name: "Pomada Cicatrizante",
-      expiry: new Date("2025-02-28"),
-      daysLeft: 31,
-    },
-    {
-      name: "Vacina Gripe Canina",
-      expiry: new Date("2025-03-10"),
-      daysLeft: 41,
-    },
-  ],
-
-  monthlyTrends: [
-    { month: "Set", purchases: 12500, sales: 18400, profit: 5900 },
-    { month: "Out", purchases: 15200, sales: 21300, profit: 6100 },
-    { month: "Nov", purchases: 13800, sales: 19850, profit: 6050 },
-    { month: "Dez", purchases: 16500, sales: 24200, profit: 7700 },
-    { month: "Jan", purchases: 14200, sales: 20500, profit: 6300 },
-  ],
-};
+    totalProducts: number;
+    totalValue: number;
+    lowStockItems: number;
+    expiredItems: number;
+    expiringItems: number;
+    avgTurnover: number;
+    monthlyGrowth: number;
+  };
+  categoryAnalysis: {
+    category: string;
+    products: number;
+    value: number;
+    percentage: number;
+  }[];
+  topProducts: {
+    name: string;
+    movement: number;
+    revenue: number;
+    margin: number;
+  }[];
+  lowStockAlert: {
+    name: string;
+    current: number;
+    minimum: number;
+    status: 'critical' | 'low';
+  }[];
+  expiryAlert: {
+    name: string;
+    expiry: Date;
+    daysLeft: number;
+  }[];
+  monthlyTrends: {
+    month: string;
+    purchases: number;
+    sales: number;
+    profit: number;
+  }[];
+}
 
 export default function InventoryReportsPage() {
+  const { user } = useAuth();
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth() - 3, 1),
     end: new Date(),
   });
-  const [selectedReport, setSelectedReport] = useState<string>("overview");
+  const [selectedReport, setSelectedReport] = useState<string>("inventory");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleExportPDF = () => {
-    console.log("Exporting to PDF...");
+  useEffect(() => {
+    loadReportData();
+  }, [selectedReport, dateRange]);
+
+  const loadReportData = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params = new URLSearchParams({
+        type: selectedReport,
+        startDate: dateRange.start.toISOString().split('T')[0],
+        endDate: dateRange.end.toISOString().split('T')[0],
+        groupBy: 'month'
+      });
+      
+      const response = await fetch(`/api/reports?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao carregar relatório');
+      }
+      
+      const data = await response.json();
+      
+      // Transform API data to match our interface
+      const transformedData: ReportData = {
+        summary: {
+          totalProducts: data.data?.totalProducts || 0,
+          totalValue: data.data?.totalValue || 0,
+          lowStockItems: data.data?.lowStockItems || 0,
+          expiredItems: data.data?.expiredItems || 0,
+          expiringItems: data.data?.expiringItems || 0,
+          avgTurnover: data.data?.avgTurnover || 0,
+          monthlyGrowth: data.data?.monthlyGrowth || 0,
+        },
+        categoryAnalysis: data.data?.categoryAnalysis || [],
+        topProducts: data.data?.topProducts || [],
+        lowStockAlert: data.data?.lowStockAlert || [],
+        expiryAlert: (data.data?.expiryAlert || []).map((item: any) => ({
+          ...item,
+          expiry: new Date(item.expiry)
+        })),
+        monthlyTrends: data.data?.monthlyTrends || []
+      };
+      
+      setReportData(transformedData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar relatório');
+      console.error('Erro ao carregar relatório:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadReportData();
+    setRefreshing(false);
+  };
+
+  const handleExportPDF = async () => {
+    if (!user) return;
+    
+    try {
+      const params = new URLSearchParams({
+        type: selectedReport,
+        startDate: dateRange.start.toISOString().split('T')[0],
+        endDate: dateRange.end.toISOString().split('T')[0],
+        format: 'pdf'
+      });
+      
+      const response = await fetch(`/api/reports/export?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error('Erro ao exportar relatório');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio_estoque_${selectedReport}_${dateRange.start.toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao exportar relatório');
+    }
   };
 
   const handlePrint = () => {
@@ -130,8 +181,8 @@ export default function InventoryReportsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/inventory">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar para Estoque
             </Link>
@@ -147,6 +198,10 @@ export default function InventoryReportsPage() {
         </div>
 
         <div className="flex items-center space-x-2">
+          <Button variant="ghost" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
           <Button variant="secondary" onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-2" />
             Imprimir
@@ -171,10 +226,12 @@ export default function InventoryReportsPage() {
                 onChange={(e) => setSelectedReport(e.target.value)}
                 className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
               >
-                <option value="overview">Visão Geral</option>
-                <option value="financial">Financeiro</option>
-                <option value="stock">Controle de Estoque</option>
-                <option value="movement">Movimentação</option>
+                <option value="inventory">Estoque</option>
+                <option value="appointments">Consultas</option>
+                <option value="revenue">Receita</option>
+                <option value="pets">Pets</option>
+                <option value="veterinarians">Veterinários</option>
+                <option value="guardians">Tutores</option>
               </select>
             </div>
             <div>
@@ -205,9 +262,9 @@ export default function InventoryReportsPage() {
               />
             </div>
             <div className="flex items-end">
-              <Button className="w-full">
+              <Button className="w-full" onClick={loadReportData} disabled={loading}>
                 <Filter className="w-4 h-4 mr-2" />
-                Aplicar Filtros
+                {loading ? 'Carregando...' : 'Aplicar Filtros'}
               </Button>
             </div>
           </div>
@@ -222,10 +279,10 @@ export default function InventoryReportsPage() {
               <div>
                 <p className="text-sm text-text-secondary">Total de Produtos</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {inventoryReports.summary.totalProducts}
+                  {reportData?.summary.totalProducts || 0}
                 </p>
                 <p className="text-xs text-success">
-                  +{inventoryReports.summary.monthlyGrowth}% este mês
+                  +{reportData?.summary.monthlyGrowth || 0}% este mês
                 </p>
               </div>
               <Package className="w-8 h-8 text-primary-500" />
@@ -239,7 +296,7 @@ export default function InventoryReportsPage() {
               <div>
                 <p className="text-sm text-text-secondary">Valor Total</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {formatCurrency(inventoryReports.summary.totalValue)}
+                  {formatCurrency(reportData?.summary.totalValue || 0)}
                 </p>
                 <p className="text-xs text-text-tertiary">Valor do estoque</p>
               </div>
@@ -254,7 +311,7 @@ export default function InventoryReportsPage() {
               <div>
                 <p className="text-sm text-text-secondary">Estoque Baixo</p>
                 <p className="text-2xl font-bold text-error">
-                  {inventoryReports.summary.lowStockItems}
+                  {reportData?.summary.lowStockItems || 0}
                 </p>
                 <p className="text-xs text-error">Requer atenção</p>
               </div>
@@ -271,7 +328,7 @@ export default function InventoryReportsPage() {
               <div>
                 <p className="text-sm text-text-secondary">Giro Médio</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {inventoryReports.summary.avgTurnover}x
+                  {reportData?.summary.avgTurnover || 0}x
                 </p>
                 <p className="text-xs text-text-tertiary">Por mês</p>
               </div>
@@ -293,7 +350,7 @@ export default function InventoryReportsPage() {
             </h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            {inventoryReports.categoryAnalysis.map((category, index) => (
+            {(reportData?.categoryAnalysis || []).map((category, index) => (
               <motion.div
                 key={category.category}
                 className="flex items-center justify-between p-3 bg-background-secondary rounded-lg"
@@ -337,7 +394,7 @@ export default function InventoryReportsPage() {
             </h3>
           </CardHeader>
           <CardContent className="space-y-4">
-            {inventoryReports.topProducts.map((product, index) => (
+            {(reportData?.topProducts || []).map((product, index) => (
               <motion.div
                 key={product.name}
                 className="flex items-center justify-between p-3 bg-background-secondary rounded-lg"
@@ -382,7 +439,7 @@ export default function InventoryReportsPage() {
             </h3>
           </CardHeader>
           <CardContent className="space-y-3">
-            {inventoryReports.lowStockAlert.map((item, index) => (
+            {(reportData?.lowStockAlert || []).map((item, index) => (
               <motion.div
                 key={item.name}
                 className={`p-3 rounded-lg border-l-4 ${
@@ -427,7 +484,7 @@ export default function InventoryReportsPage() {
             </h3>
           </CardHeader>
           <CardContent className="space-y-3">
-            {inventoryReports.expiryAlert.map((item, index) => (
+            {(reportData?.expiryAlert || []).map((item, index) => (
               <motion.div
                 key={item.name}
                 className="p-3 bg-warning/5 border-l-4 border-l-warning rounded-lg"
@@ -464,7 +521,7 @@ export default function InventoryReportsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            {inventoryReports.monthlyTrends.map((month, index) => (
+            {(reportData?.monthlyTrends || []).map((month, index) => (
               <motion.div
                 key={month.month}
                 className="p-4 bg-background-secondary rounded-lg text-center"
@@ -517,7 +574,7 @@ export default function InventoryReportsPage() {
               </h4>
               <ul className="text-sm text-success/80 space-y-1">
                 <li>
-                  • Crescimento de {inventoryReports.summary.monthlyGrowth}% no
+                  • Crescimento de {reportData?.summary.monthlyGrowth || 0}% no
                   estoque
                 </li>
                 <li>• Boa margem de lucro nos produtos principais</li>
@@ -531,11 +588,11 @@ export default function InventoryReportsPage() {
               </h4>
               <ul className="text-sm text-warning/80 space-y-1">
                 <li>
-                  • {inventoryReports.summary.lowStockItems} produtos com
+                  • {reportData?.summary.lowStockItems || 0} produtos com
                   estoque baixo
                 </li>
                 <li>
-                  • {inventoryReports.summary.expiringItems} produtos vencendo
+                  • {reportData?.summary.expiringItems || 0} produtos vencendo
                   em breve
                 </li>
                 <li>• Necessário reposição urgente</li>
@@ -546,7 +603,7 @@ export default function InventoryReportsPage() {
               <h4 className="font-semibold text-error mb-2">Ações Urgentes</h4>
               <ul className="text-sm text-error/80 space-y-1">
                 <li>
-                  • {inventoryReports.summary.expiredItems} produtos vencidos
+                  • {reportData?.summary.expiredItems || 0} produtos vencidos
                 </li>
                 <li>• Reposição crítica de medicamentos</li>
                 <li>• Revisar fornecedores</li>
@@ -555,6 +612,29 @@ export default function InventoryReportsPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {loading && (
+        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+          <div className="bg-surface p-6 rounded-lg shadow-lg flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+            <span className="text-text-primary">Carregando relatório...</span>
+          </div>
+        </div>
+      )}
+      
+      {error && (
+        <div className="fixed top-4 right-4 bg-error text-error-foreground p-4 rounded-lg shadow-lg z-50 max-w-md">
+          <div className="flex items-center justify-between">
+            <span>{error}</span>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-2 text-error-foreground hover:text-error-foreground/80"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

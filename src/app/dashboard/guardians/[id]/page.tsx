@@ -79,9 +79,9 @@ export default function GuardianProfilePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/guardians">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/guardians" className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
               Voltar
             </Link>
           </Button>
@@ -93,9 +93,9 @@ export default function GuardianProfilePage() {
           </div>
         </div>
 
-        <Button>
-          <Link href={`/dashboard/guardians/${appointmentId}/edit`}>
-            <Edit className="w-4 h-4 mr-2" />
+        <Button asChild>
+          <Link href={`/dashboard/guardians/${appointmentId}/edit`} className="flex items-center gap-2">
+            <Edit className="w-4 h-4" />
             Editar
           </Link>
         </Button>
@@ -241,8 +241,8 @@ export default function GuardianProfilePage() {
                   <h3 className="text-lg font-semibold text-text-primary">
                     Pets
                   </h3>
-                  <Button size="sm">
-                    <Link href="/dashboard/pets/new">
+                  <Button size="sm" asChild>
+                    <Link href="/dashboard/pets/new" className="flex items-center justify-center">
                       <Plus className="w-4 h-4" />
                     </Link>
                   </Button>
@@ -322,8 +322,8 @@ export default function GuardianProfilePage() {
                     </div>
                   </div>
 
-                  <Button variant="secondary" className="w-full">
-                    <Link href={`/dashboard/pets/${pet.pet_id}`}>
+                  <Button variant="secondary" className="w-full" asChild>
+                    <Link href={`/dashboard/pets/${pet.pet_id}`} className="flex items-center justify-center">
                       Ver Perfil
                     </Link>
                   </Button>
@@ -349,8 +349,8 @@ export default function GuardianProfilePage() {
                 <p className="text-sm text-text-secondary mb-4">
                   Cadastre um novo pet para este tutor
                 </p>
-                <Button className="w-full">
-                  <Link href="/dashboard/pets/new">
+                <Button className="w-full" asChild>
+                  <Link href="/dashboard/pets/new" className="flex items-center justify-center">
                     <Plus className="w-4 h-4 mr-2" />
                     Novo Pet
                   </Link>

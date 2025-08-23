@@ -1,4 +1,3 @@
-//@ts-nocheck
 "use client";
 
 import "react-grid-layout/css/styles.css";

@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -19,10 +18,14 @@ import {
   Edit,
   Receipt,
   FileSpreadsheet,
+  Filter,
+  Eye,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -32,106 +35,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { consultationAPI, type Consultation } from "@/lib/api/consultations";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-// Mock data
-const mockConsultations = [
-  {
-    consultation_id: "1",
-    description: "Consulta de rotina - Exame geral completo",
-    amount: 120.0,
-    payment_method: "card",
-    payment_plan: 1,
-    paid: true,
-    created_at: new Date(2025, 0, 25, 9, 30),
-    pet: {
-      name: "Buddy",
-      species: "Cão",
-      breed: "Golden Retriever",
-    },
-    guardian: {
-      fullName: "João Silva",
-      phone: "(11) 99999-9999",
-    },
-    veterinarian: {
-      fullName: "Dra. Maria Santos",
-      specialty: "Clínica Geral",
-    },
-    appointment: {
-      dateTime: new Date(2025, 0, 25, 9, 0),
-      status: "completed",
-    },
-    prescription: {
-      text: "Antibiótico - Amoxicilina 250mg - 1 comprimido de 12/12h por 7 dias",
-    },
-  },
-  {
-    consultation_id: "2",
-    description: "Vacinação V10 + Vermifugação",
-    amount: 85.0,
-    payment_method: "pix",
-    payment_plan: 1,
-    paid: true,
-    created_at: new Date(2025, 0, 24, 14, 15),
-    pet: {
-      name: "Luna",
-      species: "Gato",
-      breed: "Siamês",
-    },
-    guardian: {
-      fullName: "Pedro Costa",
-      phone: "(11) 88888-8888",
-    },
-    veterinarian: {
-      fullName: "Dr. Carlos Lima",
-      specialty: "Imunização",
-    },
-    appointment: {
-      dateTime: new Date(2025, 0, 24, 14, 0),
-      status: "completed",
-    },
-    prescription: null,
-  },
-  {
-    consultation_id: "3",
-    description: "Consulta dermatológica - Tratamento de alergia",
-    amount: 150.0,
-    payment_method: "card",
-    payment_plan: 2,
-    paid: false,
-    created_at: new Date(2025, 0, 23, 16, 45),
-    pet: {
-      name: "Max",
-      species: "Cão",
-      breed: "Pastor Alemão",
-    },
-    guardian: {
-      fullName: "Ana Oliveira",
-      phone: "(11) 77777-7777",
-    },
-    veterinarian: {
-      fullName: "Dra. Ana Oliveira",
-      specialty: "Dermatologia",
-    },
-    appointment: {
-      dateTime: new Date(2025, 0, 23, 16, 30),
-      status: "completed",
-    },
-    prescription: {
-      text: "Antialérgico - Prednisolona 5mg - 1/2 comprimido de 24/24h por 5 dias",
-    },
-  },
-];
-
-const paymentMethodLabels = {
-  cash: "Dinheiro",
-  card: "Cartão",
-  pix: "PIX",
-  transfer: "Transferência",
-};
-
-function ConsultationCard({ consultation }: { consultation: any }) {
+function ConsultationCard({ 
+  consultation, 
+  onDelete 
+}: { 
+  consultation: Consultation;
+  onDelete: (id: string) => void;
+}) {
   const [showMenu, setShowMenu] = useState(false);
+  const router = useRouter();
 
   return (
     <motion.div
@@ -159,19 +75,18 @@ function ConsultationCard({ consultation }: { consultation: any }) {
 
             <div className="flex items-center space-x-2">
               <div className="text-right">
-                <p className="text-lg font-bold text-success">
-                  {formatCurrency(consultation.amount)}
-                </p>
-                <div className="flex items-center space-x-1">
-                  {consultation.paid ? (
+                <div className="flex items-center space-x-1 justify-end mb-1">
+                  {consultation.status === 'COMPLETED' ? (
                     <CheckCircle className="w-4 h-4 text-success" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-error" />
+                    <Clock className="w-4 h-4 text-warning" />
                   )}
-                  <span
-                    className={`text-xs ${consultation.paid ? "text-success" : "text-error"}`}
-                  >
-                    {consultation.paid ? "Pago" : "Pendente"}
+                  <span className={`text-xs ${
+                    consultation.status === 'COMPLETED' 
+                      ? 'text-success' 
+                      : 'text-warning'
+                  }`}>
+                    {consultation.status === 'COMPLETED' ? 'Concluída' : 'Em Andamento'}
                   </span>
                 </div>
               </div>
@@ -193,6 +108,13 @@ function ConsultationCard({ consultation }: { consultation: any }) {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                   >
+                    <button
+                      onClick={() => router.push(`/dashboard/consultations/${consultation.consultation_id}`)}
+                      className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Ver Detalhes
+                    </button>
                     <Link
                       href={`/dashboard/consultations/${consultation.consultation_id}/edit`}
                       className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
@@ -201,17 +123,21 @@ function ConsultationCard({ consultation }: { consultation: any }) {
                       Editar
                     </Link>
                     {consultation.prescription && (
-                      <Link
-                        href={`/dashboard/consultations/${consultation.consultation_id}/prescription`}
-                        className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
-                      >
+                      <button className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary">
                         <Receipt className="w-4 h-4 mr-2" />
                         Ver Prescrição
-                      </Link>
+                      </button>
                     )}
-                    <button className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary">
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Gerar Recibo
+                    <button 
+                      onClick={() => {
+                        if (window.confirm('Tem certeza que deseja excluir esta consulta?')) {
+                          onDelete(consultation.consultation_id);
+                        }
+                      }}
+                      className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Excluir
                     </button>
                   </motion.div>
                 )}
@@ -226,42 +152,50 @@ function ConsultationCard({ consultation }: { consultation: any }) {
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <User className="w-4 h-4 mr-2" />
-              {consultation.guardian.fullName}
+              {consultation.guardian.name}
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Stethoscope className="w-4 h-4 mr-2" />
-              {consultation.veterinarian.fullName} -{" "}
-              {consultation.veterinarian.specialty}
+              {consultation.veterinarian.name} - {consultation.veterinarian.specialty}
             </div>
           </div>
 
           <div className="bg-background-secondary rounded-md p-3 mb-3">
             <p className="text-sm text-text-primary line-clamp-2">
-              {consultation.description}
+              <strong>Diagnóstico:</strong> {consultation.diagnosis}
             </p>
+            {consultation.treatment && (
+              <p className="text-sm text-text-secondary line-clamp-1 mt-1">
+                <strong>Tratamento:</strong> {consultation.treatment}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
-              <span className="text-text-secondary">
-                Pagamento:{" "}
-                {
-                  paymentMethodLabels[
-                    consultation.payment_method as keyof typeof paymentMethodLabels
-                  ]
-                }
-              </span>
-              {consultation.payment_plan > 1 && (
+              {consultation.vitalSigns.weight && (
                 <span className="text-text-secondary">
-                  {consultation.payment_plan}x
+                  {consultation.vitalSigns.weight}kg
+                </span>
+              )}
+              {consultation.symptoms && consultation.symptoms.length > 0 && (
+                <span className="text-text-secondary">
+                  {consultation.symptoms.length} sintomas
                 </span>
               )}
             </div>
-            {consultation.prescription && (
-              <span className="text-primary-600 text-xs bg-primary-100 px-2 py-1 rounded">
-                Com prescrição
-              </span>
-            )}
+            <div className="flex items-center space-x-2">
+              {consultation.prescription && (
+                <span className="text-primary-600 text-xs bg-primary-100 px-2 py-1 rounded">
+                  Com prescrição
+                </span>
+              )}
+              {consultation.followUpDate && (
+                <span className="text-warning text-xs bg-warning/10 px-2 py-1 rounded">
+                  Retorno
+                </span>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -270,40 +204,77 @@ function ConsultationCard({ consultation }: { consultation: any }) {
 }
 
 export default function ConsultationsListPage() {
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [paymentFilter, setPaymentFilter] = useState("all");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [veterinarianFilter, setVeterinarianFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-
-  const filteredConsultations = mockConsultations.filter((consultation) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      consultation.pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      consultation.guardian.fullName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      consultation.veterinarian.fullName
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      consultation.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesPayment =
-      paymentFilter === "all" || consultation.payment_method === paymentFilter;
-    const matchesPaymentStatus =
-      paymentStatusFilter === "all" ||
-      (paymentStatusFilter === "paid" && consultation.paid) ||
-      (paymentStatusFilter === "pending" && !consultation.paid);
-
-    return matchesSearch && matchesPayment && matchesPaymentStatus;
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
   });
+  
+  const router = useRouter();
 
-  const totalRevenue = mockConsultations
-    .filter((c) => c.paid)
-    .reduce((total, c) => total + c.amount, 0);
+  useEffect(() => {
+    loadConsultations();
+  }, [pagination.page, searchTerm, statusFilter, veterinarianFilter]);
 
-  const pendingRevenue = mockConsultations
-    .filter((c) => !c.paid)
-    .reduce((total, c) => total + c.amount, 0);
+  const loadConsultations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const params: any = {
+        page: pagination.page,
+        limit: pagination.limit,
+      };
+      
+      if (searchTerm) params.search = searchTerm;
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (veterinarianFilter !== 'all') params.veterinarianId = veterinarianFilter;
+      
+      const response = await consultationAPI.getConsultations(params);
+      
+      setConsultations(response.consultations);
+      setPagination(response.pagination);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar consultas');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (consultationId: string) => {
+    try {
+      await consultationAPI.deleteConsultation(consultationId);
+      loadConsultations();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao excluir consulta');
+    }
+  };
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const handleFilterChange = (filter: string, value: string) => {
+    if (filter === 'status') setStatusFilter(value);
+    if (filter === 'veterinarian') setVeterinarianFilter(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const totalConsultations = pagination.total;
+  const completedConsultations = consultations.filter(c => c.status === 'COMPLETED').length;
+  const inProgressConsultations = consultations.filter(c => c.status === 'IN_PROGRESS').length;
+  const thisMonthConsultations = consultations.filter(
+    c => new Date(c.created_at).getMonth() === new Date().getMonth()
+  ).length;
 
   return (
     <div className="p-6 space-y-6">
@@ -315,46 +286,63 @@ export default function ConsultationsListPage() {
             Gerencie o histórico de consultas realizadas
           </p>
         </div>
-        <Button>
-          <Link href="/dashboard/consultations/new">
+        <Button asChild>
+          <Link href="/dashboard/consultations/new" className="flex items-center">
             <Plus className="w-4 h-4 mr-2" />
             Nova Consulta
           </Link>
         </Button>
       </div>
 
+      {/* Error State */}
+      {error && (
+        <Card className="border-error">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 text-error">
+              <AlertCircle className="w-5 h-5" />
+              <p>{error}</p>
+            </div>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="mt-3"
+              onClick={loadConsultations}
+            >
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex-1 max-w-md">
             <Input
-              placeholder="Buscar por pet, tutor, veterinário..."
+              placeholder="Buscar por pet, tutor, diagnóstico..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               icon={Search}
             />
           </div>
 
           <select
-            value={paymentFilter}
-            onChange={(e) => setPaymentFilter(e.target.value)}
-            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
-          >
-            <option value="all">Todas as formas</option>
-            <option value="cash">Dinheiro</option>
-            <option value="card">Cartão</option>
-            <option value="pix">PIX</option>
-            <option value="transfer">Transferência</option>
-          </select>
-
-          <select
-            value={paymentStatusFilter}
-            onChange={(e) => setPaymentStatusFilter(e.target.value)}
+            value={statusFilter}
+            onChange={(e) => handleFilterChange('status', e.target.value)}
             className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
           >
             <option value="all">Todos os status</option>
-            <option value="paid">Pago</option>
-            <option value="pending">Pendente</option>
+            <option value="COMPLETED">Concluída</option>
+            <option value="IN_PROGRESS">Em Andamento</option>
+          </select>
+
+          <select
+            value={veterinarianFilter}
+            onChange={(e) => handleFilterChange('veterinarian', e.target.value)}
+            className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary focus:border-border-focus focus:outline-none"
+          >
+            <option value="all">Todos veterinários</option>
+            {/* Veterinarians would be loaded from API in a real implementation */}
           </select>
         </div>
 
@@ -386,7 +374,7 @@ export default function ConsultationsListPage() {
                   Total de Consultas
                 </p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {mockConsultations.length}
+                  {totalConsultations}
                 </p>
               </div>
               <FileText className="w-8 h-8 text-primary-500" />
@@ -398,12 +386,12 @@ export default function ConsultationsListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">Faturamento Total</p>
+                <p className="text-sm text-text-secondary">Concluídas</p>
                 <p className="text-2xl font-bold text-success">
-                  {formatCurrency(totalRevenue)}
+                  {completedConsultations}
                 </p>
               </div>
-              <DollarSign className="w-8 h-8 text-success" />
+              <CheckCircle className="w-8 h-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -412,9 +400,9 @@ export default function ConsultationsListPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-text-secondary">Pendente</p>
+                <p className="text-sm text-text-secondary">Em Andamento</p>
                 <p className="text-2xl font-bold text-warning">
-                  {formatCurrency(pendingRevenue)}
+                  {inProgressConsultations}
                 </p>
               </div>
               <Clock className="w-8 h-8 text-warning" />
@@ -428,11 +416,7 @@ export default function ConsultationsListPage() {
               <div>
                 <p className="text-sm text-text-secondary">Este Mês</p>
                 <p className="text-2xl font-bold text-text-primary">
-                  {
-                    mockConsultations.filter(
-                      (c) => c.created_at.getMonth() === new Date().getMonth(),
-                    ).length
-                  }
+                  {thisMonthConsultations}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-secondary-500" />
@@ -442,16 +426,34 @@ export default function ConsultationsListPage() {
       </div>
 
       {/* Content */}
-      {viewMode === "cards" ? (
+      {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredConsultations.map((consultation, index) => (
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Card key={index} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  <div className="h-4 bg-background-secondary rounded w-3/4"></div>
+                  <div className="h-4 bg-background-secondary rounded w-1/2"></div>
+                  <div className="h-20 bg-background-secondary rounded"></div>
+                  <div className="h-4 bg-background-secondary rounded w-2/3"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : viewMode === "cards" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {consultations.map((consultation, index) => (
             <motion.div
               key={consultation.consultation_id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <ConsultationCard consultation={consultation} />
+              <ConsultationCard 
+                consultation={consultation} 
+                onDelete={handleDelete}
+              />
             </motion.div>
           ))}
         </div>
@@ -464,13 +466,13 @@ export default function ConsultationsListPage() {
                 <TableHead>Tutor</TableHead>
                 <TableHead>Veterinário</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead>Valor</TableHead>
+                <TableHead>Diagnóstico</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredConsultations.map((consultation) => (
+              {consultations.map((consultation) => (
                 <TableRow key={consultation.consultation_id}>
                   <TableCell>
                     <div className="flex items-center space-x-3">
@@ -488,34 +490,43 @@ export default function ConsultationsListPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-text-secondary">
-                    {consultation.guardian.fullName}
+                    {consultation.guardian.name}
                   </TableCell>
                   <TableCell className="text-text-secondary">
-                    {consultation.veterinarian.fullName}
+                    {consultation.veterinarian.name}
                   </TableCell>
                   <TableCell className="text-text-secondary">
                     {formatDate(consultation.created_at)}
                   </TableCell>
-                  <TableCell className="font-medium text-success">
-                    {formatCurrency(consultation.amount)}
+                  <TableCell className="text-text-primary">
+                    {consultation.diagnosis}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
-                      {consultation.paid ? (
+                      {consultation.status === 'COMPLETED' ? (
                         <CheckCircle className="w-4 h-4 text-success" />
                       ) : (
-                        <XCircle className="w-4 h-4 text-error" />
+                        <Clock className="w-4 h-4 text-warning" />
                       )}
                       <span
-                        className={`text-sm ${consultation.paid ? "text-success" : "text-error"}`}
+                        className={`text-sm ${
+                          consultation.status === 'COMPLETED' 
+                            ? 'text-success' 
+                            : 'text-warning'
+                        }`}
                       >
-                        {consultation.paid ? "Pago" : "Pendente"}
+                        {consultation.status === 'COMPLETED' ? 'Concluída' : 'Em Andamento'}
                       </span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="w-4 h-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => router.push(`/dashboard/consultations/${consultation.consultation_id}`)}
+                    >
+                      <Eye className="w-4 h-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -525,21 +536,51 @@ export default function ConsultationsListPage() {
         </Card>
       )}
 
-      {filteredConsultations.length === 0 && (
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-text-secondary">
+            Mostrando {(pagination.page - 1) * pagination.limit + 1} a{' '}
+            {Math.min(pagination.page * pagination.limit, pagination.total)} de{' '}
+            {pagination.total} consultas
+          </p>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              disabled={pagination.page === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-text-secondary">
+              Página {pagination.page} de {pagination.pages}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              disabled={pagination.page === pagination.pages}
+            >
+              Próxima
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!loading && consultations.length === 0 && (
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-2">
             Nenhuma consulta encontrada
           </h3>
           <p className="text-text-secondary mb-4">
-            {searchTerm ||
-            paymentFilter !== "all" ||
-            paymentStatusFilter !== "all"
+            {searchTerm || statusFilter !== "all" || veterinarianFilter !== "all"
               ? "Tente ajustar os filtros de busca"
               : "Comece registrando a primeira consulta"}
           </p>
-          <Button>
-            <Link href="/dashboard/consultations/new">
+          <Button asChild>
+            <Link href="/dashboard/consultations/new" className="flex items-center">
               <Plus className="w-4 h-4 mr-2" />
               Nova Consulta
             </Link>

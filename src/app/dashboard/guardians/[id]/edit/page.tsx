@@ -170,8 +170,8 @@ export default function EditGuardianPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href={`/dashboard/guardians/${appointmentId}`}>
+          <Button variant="ghost" asChild>
+            <Link href={`/dashboard/guardians/${appointmentId}`} className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>
@@ -329,8 +329,8 @@ export default function EditGuardianPage() {
                     <Heart className="w-5 h-5 mr-2" />
                     Pets Associados ({mockGuardian.pets.length})
                   </h2>
-                  <Button variant="secondary" size="sm">
-                    <Link href="/dashboard/pets/new">Adicionar Pet</Link>
+                  <Button variant="secondary" size="sm" asChild>
+                    <Link href="/dashboard/pets/new" className="flex items-center justify-center">Adicionar Pet</Link>
                   </Button>
                 </div>
               </CardHeader>
@@ -365,13 +365,13 @@ export default function EditGuardianPage() {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="sm">
-                          <Link href={`/dashboard/pets/${pet.pet_id}`}>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/pets/${pet.pet_id}`} className="flex items-center justify-center">
                             <Eye className="w-4 h-4" />
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="sm">
-                          <Link href={`/dashboard/pets/${pet.pet_id}/edit`}>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/pets/${pet.pet_id}/edit`} className="flex items-center justify-center">
                             <User className="w-4 h-4" />
                           </Link>
                         </Button>
@@ -403,16 +403,16 @@ export default function EditGuardianPage() {
                   {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
 
-                <Button variant="secondary" className="w-full">
-                  <Link href={`/dashboard/guardians/${appointmentId}`}>
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href={`/dashboard/guardians/${appointmentId}`} className="flex items-center justify-center">
                     Cancelar Edição
                   </Link>
                 </Button>
 
                 <hr className="border-border" />
 
-                <Button variant="secondary" className="w-full">
-                  <Link href="/dashboard/appointments/new">
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href="/dashboard/appointments/new" className="flex items-center justify-center">
                     <Calendar className="w-4 h-4 mr-2" />
                     Agendar Consulta
                   </Link>

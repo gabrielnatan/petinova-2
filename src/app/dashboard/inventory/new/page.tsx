@@ -144,8 +144,8 @@ export default function NewProductPage() {
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
-        <Button variant="ghost">
-          <Link href="/dashboard/inventory">
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/inventory" className="flex items-center">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar
           </Link>
@@ -590,8 +590,8 @@ export default function NewProductPage() {
                   {isSubmitting ? "Salvando..." : "Cadastrar Produto"}
                 </Button>
 
-                <Button variant="secondary" className="w-full">
-                  <Link href="/dashboard/inventory">Cancelar</Link>
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href="/dashboard/inventory" className="flex items-center justify-center">Cancelar</Link>
                 </Button>
               </CardContent>
             </Card>

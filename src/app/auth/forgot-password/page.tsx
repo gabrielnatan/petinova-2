@@ -1,6 +1,7 @@
 //@ts-nocheck
 "use client";
 import { useThemeStyles } from "@/components/theme-provider";
+import { AuthRedirect } from "@/components/auth-redirect";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Mail } from "lucide-react";
 import { motion } from "motion/react";
@@ -77,7 +78,8 @@ export default function ForgotPasswordPage() {
   //  title="Esqueceu sua Senha?"
   //   subtitle="Digite seu email para receber um link de recuperação"
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <AuthRedirect>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Email Field */}
       <div>
         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -133,5 +135,6 @@ export default function ForgotPasswordPage() {
         </Link>
       </div>
     </form>
+    </AuthRedirect>
   );
 }

@@ -201,9 +201,9 @@ export default function EditConsultationPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href={`/dashboard/consultations/${appointmentId}`}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button variant="ghost" asChild>
+            <Link href={`/dashboard/consultations/${appointmentId}`} className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
               Voltar
             </Link>
           </Button>
@@ -564,17 +564,18 @@ export default function EditConsultationPage() {
                   {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
 
-                <Button variant="secondary" className="w-full">
-                  <Link href={`/dashboard/consultations/${appointmentId}`}>
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href={`/dashboard/consultations/${appointmentId}`} className="flex items-center justify-center">
                     Cancelar Edição
                   </Link>
                 </Button>
 
                 <hr className="border-border" />
 
-                <Button variant="secondary" className="w-full">
+                <Button variant="secondary" className="w-full" asChild>
                   <Link
                     href={`/dashboard/consultations/${appointmentId}/prescription`}
+                    className="flex items-center justify-center"
                   >
                     <Pill className="w-4 h-4 mr-2" />
                     Ver Receituário

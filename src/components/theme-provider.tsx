@@ -2,6 +2,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useThemeStorage } from "@/hooks/use-theme-storage";
 
 export type Theme = "light" | "dark" | "monochromatic";
 
@@ -31,38 +32,56 @@ export function ThemeProvider({
   children,
   defaultTheme = "light",
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [mounted, setMounted] = useState(false);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { saveTheme, getTheme } = useThemeStorage();
   const availableThemes: Theme[] = ["light", "dark", "monochromatic"];
+  
+  // Simple theme state - always start with default for SSR
+  const [theme, setThemeState] = useState<Theme>(defaultTheme);
 
+  // Single useEffect for initialization
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    
     setMounted(true);
-
-    // Check localStorage for saved theme
-    const savedTheme = localStorage.getItem("petinova-theme") as Theme;
-    if (savedTheme && availableThemes.includes(savedTheme)) {
-      setThemeState(savedTheme);
+    
+    // Get theme from DOM first (set by inline script), then localStorage, then system
+    let initialTheme = defaultTheme;
+    
+    // 1. Check DOM
+    const domTheme = document.documentElement.getAttribute("data-theme") as Theme;
+    if (domTheme && availableThemes.includes(domTheme)) {
+      initialTheme = domTheme;
     } else {
-      // Check system preference
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-      setThemeState(systemTheme);
+      // 2. Check localStorage
+      const savedTheme = getTheme() as Theme;
+      if (savedTheme && availableThemes.includes(savedTheme)) {
+        initialTheme = savedTheme;
+      } else {
+        // 3. Check system preference
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+          .matches ? "dark" : "light";
+        initialTheme = systemTheme;
+      }
+      
+      // Apply to DOM if not already there
+      document.documentElement.setAttribute("data-theme", initialTheme);
     }
-  }, [availableThemes]);
+    
+    // Set state only if different
+    setThemeState(initialTheme);
+  }, []); // Empty dependency array - run once only
 
+  // Separate effect for theme changes (after mount)
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || typeof window === "undefined") return;
 
-    // Apply theme to document
+    // Apply theme to DOM
     document.documentElement.setAttribute("data-theme", theme);
-
+    
     // Save to localStorage
-    localStorage.setItem("petinova-theme", theme);
-  }, [theme, mounted]);
+    saveTheme(theme);
+  }, [theme, mounted, saveTheme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
@@ -73,11 +92,6 @@ export function ThemeProvider({
     const nextIndex = (currentIndex + 1) % availableThemes.length;
     setTheme(availableThemes[nextIndex]);
   };
-
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return null;
-  }
 
   return (
     <ThemeContext.Provider

@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useThemeStyles } from "@/components/theme-provider";
 import { useAuth } from "@/store";
+import { AuthRedirect } from "@/components/auth-redirect";
 import Link from "next/link";
 
 const registerSchema = z
@@ -67,37 +68,28 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      });
 
-      // Mock successful registration
-      const mockUser = {
-        user_id: "1",
-        name: data.name,
-        email: data.email,
-        role: "admin",
-        active: true,
-        clinic_id: "1",
-        created_at: new Date(),
-      };
+      const result = await response.json();
 
-      const mockClinic = {
-        clinic_id: "1",
-        legalName: data.clinicName,
-        tradeName: data.clinicName,
-        cnpj: data.cnpj,
-        email: data.email,
-        address: "Endereço a ser preenchido",
-        isActive: true,
-        created_at: new Date(),
-      };
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao criar conta');
+      }
 
-      login(mockUser, mockClinic);
+      // Login with returned data
+      login(result.user, result.clinic);
 
       // Redirect to dashboard
       window.location.href = "/dashboard";
     } catch (error) {
       console.error("Registration error:", error);
+      alert(error instanceof Error ? error.message : 'Erro ao criar conta');
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +97,8 @@ export default function RegisterPage() {
   // title="Criar Conta"
   //   subtitle="Cadastre sua clínica e comece a usar o Petinova"
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <AuthRedirect>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Step Indicator */}
       <div className="flex items-center justify-center mb-6">
         <div className="flex items-center space-x-4">
@@ -411,5 +404,6 @@ export default function RegisterPage() {
         </p>
       </div>
     </form>
+    </AuthRedirect>
   );
 }

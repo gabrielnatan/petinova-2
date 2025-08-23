@@ -136,8 +136,8 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href="/dashboard/appointments">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/appointments" className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>
@@ -206,8 +206,8 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
             )}
           </div>
 
-          <Button>
-            <Link href={`/dashboard/appointments/${appointmentId}/edit`}>
+          <Button asChild>
+            <Link href={`/dashboard/appointments/${appointmentId}/edit`} className="flex items-center">
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Link>
@@ -347,9 +347,9 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                       </div>
                     </div>
                   </div>
-                  <Button variant="secondary" size="sm">
+                  <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/pets/${mockAppointment.pet.pet_id}`}
+                      href={`/dashboard/pets/${mockAppointment.pet.pet_id}`} className="flex items-center justify-center"
                     >
                       Ver Perfil
                     </Link>
@@ -397,9 +397,9 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     </div>
                   </div>
                   <div className="flex flex-col space-y-2">
-                    <Button variant="secondary" size="sm">
+                    <Button variant="secondary" size="sm" asChild>
                       <Link
-                        href={`/dashboard/guardians/${mockAppointment.guardian.guardian_id}`}
+                        href={`/dashboard/guardians/${mockAppointment.guardian.guardian_id}`} className="flex items-center justify-center"
                       >
                         Ver Perfil
                       </Link>
@@ -453,8 +453,8 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                 </h3>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button variant="secondary" className="w-full">
-                  <Link href="/dashboard/consultations/new">
+                <Button variant="secondary" className="w-full" asChild>
+                  <Link href="/dashboard/consultations/new" className="flex items-center justify-center">
                     <FileText className="w-4 h-4 mr-2" />
                     Iniciar Consulta
                   </Link>

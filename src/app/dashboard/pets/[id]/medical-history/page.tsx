@@ -342,9 +342,9 @@ export default function PetMedicalHistoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <Link href={`/dashboard/pets/${appointmentId}`}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+          <Button variant="ghost" asChild>
+            <Link href={`/dashboard/pets/${appointmentId}`} className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
               Voltar para {mockPet.name}
             </Link>
           </Button>
@@ -368,9 +368,9 @@ export default function PetMedicalHistoryPage() {
             <Download className="w-4 h-4 mr-2" />
             Exportar PDF
           </Button>
-          <Button>
-            <Link href="/dashboard/consultations/new">
-              <Plus className="w-4 h-4 mr-2" />
+          <Button asChild>
+            <Link href="/dashboard/consultations/new" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
               Nova Consulta
             </Link>
           </Button>

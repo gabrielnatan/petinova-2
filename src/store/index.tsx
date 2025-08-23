@@ -297,18 +297,33 @@ export const useAppStore = create<AppStore>()(
           isAuthenticated: true,
         }),
 
-      logout: () =>
-        set({
-          user: null,
-          currentClinic: null,
-          isAuthenticated: false,
-          pets: [],
-          guardians: [],
-          veterinarians: [],
-          appointments: [],
-          consultations: [],
-          products: [],
-        }),
+      logout: async () => {
+        try {
+          // Call logout API
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include'
+          });
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          // Clear state regardless of API response
+          set({
+            user: null,
+            currentClinic: null,
+            isAuthenticated: false,
+            pets: [],
+            guardians: [],
+            veterinarians: [],
+            appointments: [],
+            consultations: [],
+            products: [],
+          });
+          
+          // Redirect to login page
+          window.location.href = '/auth/login';
+        }
+      },
 
       // Pet Actions
       setPets: (pets) => set({ pets }),
