@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -27,19 +27,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { userAPI, type User } from "@/lib/api/users";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const roleLabels = {
   ADMIN: 'Administrador',
   VETERINARIAN: 'Veterinário',
   RECEPTIONIST: 'Recepcionista'
-};
-
-const roleColors = {
-  ADMIN: 'primary',
-  VETERINARIAN: 'secondary',
-  RECEPTIONIST: 'accent'
 };
 
 const roleIcons = {
@@ -113,13 +106,7 @@ export default function UsersSettingsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const router = useRouter();
-
-  useEffect(() => {
-    loadUsers();
-  }, [pagination.page, searchTerm, roleFilter, statusFilter]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -141,7 +128,11 @@ export default function UsersSettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchTerm, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);

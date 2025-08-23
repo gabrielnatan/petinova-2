@@ -89,25 +89,12 @@ interface ProductResponse {
 interface CreateProductData {
   name: string;
   description?: string;
-  sku: string;
-  barcode?: string;
-  category: string;
-  subcategory?: string;
-  brand?: string;
   supplier?: string;
-  purchasePrice: number;
-  salePrice: number;
-  margin?: number;
+  purchasePrice?: number;
   stock: number;
-  minimumStock: number;
-  unit: 'un' | 'kg' | 'g' | 'l' | 'ml' | 'cx' | 'pct';
-  location?: string;
   expirationDate?: string;
-  batchNumber?: string;
-  prescriptionRequired?: boolean;
-  isActive?: boolean;
   notes?: string;
-  images?: string[];
+  // Simplified to match InventoryItem model
 }
 
 type UpdateProductData = Partial<CreateProductData>
@@ -328,9 +315,9 @@ class ProductAPI {
     };
   }
 
-  async getStockMovements(productId?: string): Promise<StockMovement[]> {
-    // Este seria implementado como um endpoint separado na API
-    // Por ora, retornamos um array vazio
+  async getStockMovements(): Promise<StockMovement[]> {
+    // Stock movements not implemented with current schema
+    // Return empty array for compatibility
     return [];
   }
 

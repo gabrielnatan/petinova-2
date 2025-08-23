@@ -49,18 +49,16 @@ interface MovementResponse {
 }
 
 interface CreateMovementData {
-  productId: string;
+  itemId?: string; // For existing items
+  name?: string; // For new items
+  description?: string;
   type: 'IN' | 'OUT' | 'ADJUSTMENT';
   quantity: number;
   reason: string;
   notes?: string;
-  reference?: string;
-  referenceType?: 'CONSULTATION' | 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'EXPIRATION' | 'LOSS';
-  unitCost?: number;
+  price?: number;
   supplier?: string;
-  invoiceNumber?: string;
-  batchNumber?: string;
-  expirationDate?: string;
+  expiryDate?: string;
 }
 
 class InventoryAPI {
@@ -181,8 +179,8 @@ class InventoryAPI {
   } {
     const errors: Record<string, string> = {};
 
-    if (!data.productId) {
-      errors.productId = 'Produto é obrigatório';
+    if (!data.itemId && !data.name) {
+      errors.item = 'Item é obrigatório (ID para existente ou nome para novo)';
     }
 
     if (!data.type) {
@@ -197,8 +195,8 @@ class InventoryAPI {
       errors.reason = 'Motivo é obrigatório';
     }
 
-    if (data.unitCost && data.unitCost <= 0) {
-      errors.unitCost = 'Custo unitário deve ser maior que zero';
+    if (data.price && data.price <= 0) {
+      errors.price = 'Preço deve ser maior que zero';
     }
 
     return {

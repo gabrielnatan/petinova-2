@@ -6,19 +6,9 @@ import { z } from 'zod'
 const veterinarianCreateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  phone: z.string().min(1, 'Telefone é obrigatório'),
-  crmv: z.object({
-    number: z.string().min(1, 'Número do CRMV é obrigatório'),
-    state: z.string().min(2, 'Estado é obrigatório').max(2, 'Estado deve ter 2 caracteres'),
-    issueDate: z.string().transform((str) => new Date(str)),
-    expirationDate: z.string().transform((str) => new Date(str))
-  }),
-  specialty: z.string().optional(),
-  yearsOfExperience: z.number().min(0, 'Anos de experiência deve ser positivo').optional(),
-  availabilitySchedule: z.array(z.string()).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
-  notes: z.string().optional(),
-  isActive: z.boolean().default(true)
+  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  role: z.enum(['VETERINARIAN', 'ASSISTANT']).default('VETERINARIAN'),
+  active: z.boolean().default(true)
 })
 
 // GET /api/veterinarians - Listar veterinários
@@ -33,26 +23,25 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search') || ''
-    const specialty = searchParams.get('specialty')
+    // const specialty = searchParams.get('specialty')
     const isActive = searchParams.get('isActive')
     
     const skip = (page - 1) * limit
 
     const where: any = {
       clinicId: user.clinicId,
+      role: 'VETERINARIAN',
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
-          { email: { contains: search, mode: 'insensitive' as const } },
-          { specialty: { contains: search, mode: 'insensitive' as const } }
+          { email: { contains: search, mode: 'insensitive' as const } }
         ]
       }),
-      ...(specialty && { specialty: { contains: specialty, mode: 'insensitive' as const } }),
-      ...(isActive !== null && { isActive: isActive === 'true' })
+      ...(isActive !== null && { active: isActive === 'true' })
     }
 
     const [veterinarians, total] = await Promise.all([
-      prisma.veterinarian.findMany({
+      prisma.user.findMany({
         where,
         include: {
           _count: {
@@ -72,7 +61,7 @@ export async function GET(request: NextRequest) {
         take: limit,
         orderBy: { createdAt: 'desc' }
       }),
-      prisma.veterinarian.count({ where })
+      prisma.user.count({ where })
     ])
 
     return NextResponse.json({
@@ -80,14 +69,8 @@ export async function GET(request: NextRequest) {
         veterinarian_id: vet.id,
         fullName: vet.name,
         email: vet.email,
-        phoneNumber: vet.phone,
-        crmv: vet.crmv,
-        specialty: vet.specialty,
-        yearsOfExperience: vet.yearsOfExperience,
-        availabilitySchedule: vet.availabilitySchedule,
-        avatarUrl: vet.avatarUrl,
-        notes: vet.notes,
-        isActive: vet.isActive,
+        role: vet.role,
+        isActive: vet.active,
         clinic_id: vet.clinicId,
         stats: {
           todayAppointments: vet._count.appointments,
@@ -124,50 +107,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = veterinarianCreateSchema.parse(body)
 
-    // Verificar se já existe veterinário com o mesmo email na clínica
-    const existingByEmail = await prisma.veterinarian.findFirst({
+    // Verificar se já existe usuário com o mesmo email
+    const existingUser = await prisma.user.findUnique({
       where: {
-        email: validatedData.email,
-        clinicId: user.clinicId
+        email: validatedData.email
       }
     })
 
-    if (existingByEmail) {
+    if (existingUser) {
       return NextResponse.json(
-        { error: 'Já existe um veterinário com este email cadastrado na clínica' },
+        { error: 'Já existe um usuário com este email cadastrado' },
         { status: 400 }
       )
     }
 
-    // Verificar se já existe veterinário com o mesmo CRMV
-    const existingByCrmv = await prisma.veterinarian.findFirst({
-      where: {
-        crmv: {
-          path: ['number'],
-          equals: validatedData.crmv.number
-        }
-      }
-    })
-
-    if (existingByCrmv) {
-      return NextResponse.json(
-        { error: 'Já existe um veterinário com este CRMV cadastrado' },
-        { status: 400 }
-      )
-    }
-
-    const veterinarian = await prisma.veterinarian.create({
+    const veterinarian = await prisma.user.create({
       data: {
         name: validatedData.name,
         email: validatedData.email,
-        phone: validatedData.phone,
-        crmv: validatedData.crmv,
-        specialty: validatedData.specialty,
-        yearsOfExperience: validatedData.yearsOfExperience,
-        availabilitySchedule: validatedData.availabilitySchedule || [],
-        avatarUrl: validatedData.avatarUrl,
-        notes: validatedData.notes,
-        isActive: validatedData.isActive,
+        password: validatedData.password, // In production, this should be hashed
+        role: validatedData.role,
+        active: validatedData.active,
         clinicId: user.clinicId
       },
       include: {
@@ -186,14 +146,8 @@ export async function POST(request: NextRequest) {
         veterinarian_id: veterinarian.id,
         fullName: veterinarian.name,
         email: veterinarian.email,
-        phoneNumber: veterinarian.phone,
-        crmv: veterinarian.crmv,
-        specialty: veterinarian.specialty,
-        yearsOfExperience: veterinarian.yearsOfExperience,
-        availabilitySchedule: veterinarian.availabilitySchedule,
-        avatarUrl: veterinarian.avatarUrl,
-        notes: veterinarian.notes,
-        isActive: veterinarian.isActive,
+        role: veterinarian.role,
+        isActive: veterinarian.active,
         clinic_id: veterinarian.clinicId,
         stats: {
           todayAppointments: veterinarian._count.appointments,

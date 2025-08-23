@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -82,12 +82,7 @@ export default function StockMovementsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [movementToDelete, setMovementToDelete] = useState<StockMovement | null>(null);
 
-  // Load movements data
-  useEffect(() => {
-    loadMovements();
-  }, [pagination.page, searchTerm, filterType, dateRange]);
-
-  const loadMovements = async () => {
+  const loadMovements = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -117,7 +112,12 @@ export default function StockMovementsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, pagination.page, pagination.limit, searchTerm, filterType, dateRange]);
+
+  // Load movements data
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
 
   const handleDeleteMovement = async () => {
     if (!movementToDelete) return;

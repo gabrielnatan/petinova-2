@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { Heart } from "lucide-react";
 import { Widget } from "..";
 import { usePets } from "@/store";

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -196,12 +196,7 @@ export default function GuardiansListPage() {
   const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const formatAddress = (address: Guardian['address']) => {
-    if (!address) return 'Endereço não informado';
-    return `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ''} - ${address.neighborhood}, ${address.city} - ${address.state}`;
-  };
-
-  const loadGuardians = async (page = 1, search = "") => {
+  const loadGuardians = useCallback(async (page = 1, search = "") => {
     try {
       setLoading(true);
       setError(null);
@@ -218,11 +213,11 @@ export default function GuardiansListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadGuardians(1);
-  }, []);
+  }, [loadGuardians]);
 
   useEffect(() => {
     if (searchDebounce) {
@@ -239,7 +234,7 @@ export default function GuardiansListPage() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [searchTerm]);
+  }, [searchTerm, searchDebounce, loadGuardians]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

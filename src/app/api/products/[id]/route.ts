@@ -39,129 +39,65 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const product = await prisma.product.findFirst({
+    const item = await prisma.inventoryItem.findUnique({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
-      },
-      include: {
-        _count: {
-          select: {
-            sales: true,
-            purchases: true
-          }
-        },
-        sales: {
-          include: {
-            consultation: {
-              select: {
-                id: true,
-                createdAt: true,
-                pet: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10
-        },
-        purchases: {
-          orderBy: { createdAt: 'desc' },
-          take: 10
-        }
+        id: resolvedParams.id
       }
     })
 
-    if (!product) {
-      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
+    if (!item) {
+      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
     }
 
-    // Calcular estatísticas avançadas
-    const currentMonth = new Date()
-    currentMonth.setDate(1)
-    currentMonth.setHours(0, 0, 0, 0)
-
-    const salesThisMonth = await prisma.sale.count({
-      where: {
-        productId: product.id,
-        createdAt: {
-          gte: currentMonth
-        }
-      }
-    })
-
-    const lastSale = await prisma.sale.findFirst({
-      where: { productId: product.id },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    const averageMonthlyUsage = await prisma.sale.groupBy({
-      by: ['productId'],
-      where: {
-        productId: product.id,
-        createdAt: {
-          gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // últimos 3 meses
-        }
-      },
-      _sum: {
-        quantity: true
-      }
-    })
-
-    const avgUsage = averageMonthlyUsage.length > 0 
-      ? (averageMonthlyUsage[0]._sum.quantity || 0) / 3 
-      : 0
+    // Mock statistics since sales/purchases models don't exist yet
+    const salesThisMonth = 0
 
     return NextResponse.json({
       product: {
-        product_id: product.id,
-        name: product.name,
-        description: product.description,
-        sku: product.sku,
-        barcode: product.barcode,
-        category: product.category,
-        subcategory: product.subcategory,
-        brand: product.brand,
-        supplier: product.supplier,
+        product_id: item.id,
+        name: item.name,
+        description: item.description,
+        sku: item.id.substring(0, 8).toUpperCase(),
+        barcode: null,
+        category: 'General',
+        subcategory: null,
+        brand: null,
+        supplier: item.supplier,
         prices: {
-          purchase: product.purchasePrice,
-          sale: product.salePrice,
-          margin: product.margin
+          purchase: item.price || 0,
+          sale: item.price || 0,
+          margin: 0
         },
         inventory: {
-          stock: product.stock,
-          minimumStock: product.minimumStock,
-          unit: product.unit,
-          location: product.location,
-          estimatedDaysToStock: avgUsage > 0 ? Math.ceil(product.stock / avgUsage * 30) : null
+          stock: item.quantity,
+          minimumStock: 0,
+          unit: 'un',
+          location: null,
+          estimatedDaysToStock: null
         },
         details: {
-          expirationDate: product.expirationDate,
-          batchNumber: product.batchNumber,
-          prescriptionRequired: product.prescriptionRequired,
-          notes: product.notes,
-          images: product.images
+          expirationDate: item.expiryDate,
+          batchNumber: null,
+          prescriptionRequired: false,
+          notes: item.description,
+          images: []
         },
         stats: {
-          totalSales: product._count.sales,
-          totalPurchases: product._count.purchases,
+          totalSales: 0,
+          totalPurchases: 0,
           salesThisMonth,
-          lastSaleDate: lastSale?.createdAt,
-          averageMonthlyUsage: Math.round(avgUsage),
-          isLowStock: product.stock <= product.minimumStock,
-          isExpiringSoon: product.expirationDate && 
-            new Date(product.expirationDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          lastSaleDate: null,
+          averageMonthlyUsage: 0,
+          isLowStock: false,
+          isExpiringSoon: item.expiryDate && 
+            new Date(item.expiryDate) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         },
-        recentSales: product.sales,
-        recentPurchases: product.purchases,
-        isActive: product.isActive,
-        clinic_id: product.clinicId,
-        created_at: product.createdAt,
-        updated_at: product.updatedAt
+        recentSales: [],
+        recentPurchases: [],
+        isActive: true,
+        clinic_id: 'default',
+        created_at: item.createdAt,
+        updated_at: item.updatedAt
       }
     })
 
@@ -189,136 +125,69 @@ export async function PUT(
     const body = await request.json()
     const validatedData = productUpdateSchema.parse(body)
 
-    // Verificar se o produto pertence à clínica
-    const existingProduct = await prisma.product.findFirst({
+    // Check if inventory item exists
+    const existingItem = await prisma.inventoryItem.findUnique({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
+        id: resolvedParams.id
       }
     })
 
-    if (!existingProduct) {
-      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
     }
 
-    // Se SKU foi fornecido, verificar se já existe outro produto com o mesmo SKU
-    if (validatedData.sku && validatedData.sku !== existingProduct.sku) {
-      const skuExists = await prisma.product.findFirst({
-        where: {
-          sku: validatedData.sku,
-          clinicId: user.clinicId,
-          id: { not: resolvedParams.id }
-        }
-      })
-
-      if (skuExists) {
-        return NextResponse.json(
-          { error: 'Já existe um produto com este SKU cadastrado na clínica' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Se código de barras foi fornecido, verificar se já existe
-    if (validatedData.barcode && validatedData.barcode !== existingProduct.barcode) {
-      const barcodeExists = await prisma.product.findFirst({
-        where: {
-          barcode: validatedData.barcode,
-          clinicId: user.clinicId,
-          id: { not: resolvedParams.id }
-        }
-      })
-
-      if (barcodeExists) {
-        return NextResponse.json(
-          { error: 'Já existe um produto com este código de barras cadastrado na clínica' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Recalcular margem se preços foram alterados
-    let margin = validatedData.margin
-    if (validatedData.purchasePrice || validatedData.salePrice) {
-      const purchasePrice = validatedData.purchasePrice || existingProduct.purchasePrice
-      const salePrice = validatedData.salePrice || existingProduct.salePrice
-      margin = margin || ((salePrice - purchasePrice) / purchasePrice) * 100
-    }
-
-    const updatedProduct = await prisma.product.update({
+    // Update inventory item with simplified fields
+    const updatedItem = await prisma.inventoryItem.update({
       where: { id: resolvedParams.id },
       data: {
         ...(validatedData.name !== undefined && { name: validatedData.name }),
         ...(validatedData.description !== undefined && { description: validatedData.description }),
-        ...(validatedData.sku !== undefined && { sku: validatedData.sku }),
-        ...(validatedData.barcode !== undefined && { barcode: validatedData.barcode }),
-        ...(validatedData.category !== undefined && { category: validatedData.category }),
-        ...(validatedData.subcategory !== undefined && { subcategory: validatedData.subcategory }),
-        ...(validatedData.brand !== undefined && { brand: validatedData.brand }),
         ...(validatedData.supplier !== undefined && { supplier: validatedData.supplier }),
-        ...(validatedData.purchasePrice !== undefined && { purchasePrice: validatedData.purchasePrice }),
-        ...(validatedData.salePrice !== undefined && { salePrice: validatedData.salePrice }),
-        ...(margin !== undefined && { margin }),
-        ...(validatedData.stock !== undefined && { stock: validatedData.stock }),
-        ...(validatedData.minimumStock !== undefined && { minimumStock: validatedData.minimumStock }),
-        ...(validatedData.unit !== undefined && { unit: validatedData.unit }),
-        ...(validatedData.location !== undefined && { location: validatedData.location }),
-        ...(validatedData.expirationDate !== undefined && { expirationDate: validatedData.expirationDate }),
-        ...(validatedData.batchNumber !== undefined && { batchNumber: validatedData.batchNumber }),
-        ...(validatedData.prescriptionRequired !== undefined && { prescriptionRequired: validatedData.prescriptionRequired }),
-        ...(validatedData.isActive !== undefined && { isActive: validatedData.isActive }),
-        ...(validatedData.notes !== undefined && { notes: validatedData.notes }),
-        ...(validatedData.images !== undefined && { images: validatedData.images })
-      },
-      include: {
-        _count: {
-          select: {
-            sales: true,
-            purchases: true
-          }
-        }
+        ...(validatedData.purchasePrice !== undefined && { price: validatedData.purchasePrice }),
+        ...(validatedData.stock !== undefined && { quantity: validatedData.stock }),
+        ...(validatedData.expirationDate !== undefined && { expiryDate: validatedData.expirationDate })
       }
     })
 
     return NextResponse.json({
-      message: 'Produto atualizado com sucesso',
+      message: 'Item atualizado com sucesso',
       product: {
-        product_id: updatedProduct.id,
-        name: updatedProduct.name,
-        description: updatedProduct.description,
-        sku: updatedProduct.sku,
-        barcode: updatedProduct.barcode,
-        category: updatedProduct.category,
-        subcategory: updatedProduct.subcategory,
-        brand: updatedProduct.brand,
-        supplier: updatedProduct.supplier,
+        product_id: updatedItem.id,
+        name: updatedItem.name,
+        description: updatedItem.description,
+        sku: updatedItem.id.substring(0, 8).toUpperCase(),
+        barcode: null,
+        category: 'General',
+        subcategory: null,
+        brand: null,
+        supplier: updatedItem.supplier,
         prices: {
-          purchase: updatedProduct.purchasePrice,
-          sale: updatedProduct.salePrice,
-          margin: updatedProduct.margin
+          purchase: updatedItem.price || 0,
+          sale: updatedItem.price || 0,
+          margin: 0
         },
         inventory: {
-          stock: updatedProduct.stock,
-          minimumStock: updatedProduct.minimumStock,
-          unit: updatedProduct.unit,
-          location: updatedProduct.location
+          stock: updatedItem.quantity,
+          minimumStock: 0,
+          unit: 'un',
+          location: null
         },
         details: {
-          expirationDate: updatedProduct.expirationDate,
-          batchNumber: updatedProduct.batchNumber,
-          prescriptionRequired: updatedProduct.prescriptionRequired,
-          notes: updatedProduct.notes,
-          images: updatedProduct.images
+          expirationDate: updatedItem.expiryDate,
+          batchNumber: null,
+          prescriptionRequired: false,
+          notes: updatedItem.description,
+          images: []
         },
         stats: {
-          totalSales: updatedProduct._count.sales,
-          totalPurchases: updatedProduct._count.purchases,
-          isLowStock: updatedProduct.stock <= updatedProduct.minimumStock
+          totalSales: 0,
+          totalPurchases: 0,
+          isLowStock: false
         },
-        isActive: updatedProduct.isActive,
-        clinic_id: updatedProduct.clinicId,
-        created_at: updatedProduct.createdAt,
-        updated_at: updatedProduct.updatedAt
+        isActive: true,
+        clinic_id: 'default',
+        created_at: updatedItem.createdAt,
+        updated_at: updatedItem.updatedAt
       }
     })
 
@@ -350,45 +219,24 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    // Verificar se o produto pertence à clínica
-    const existingProduct = await prisma.product.findFirst({
+    // Check if inventory item exists
+    const existingItem = await prisma.inventoryItem.findUnique({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
-      },
-      include: {
-        _count: {
-          select: {
-            sales: true,
-            purchases: true
-          }
-        }
+        id: resolvedParams.id
       }
     })
 
-    if (!existingProduct) {
-      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
     }
 
-    // Verificar se o produto tem vendas ou compras
-    if (existingProduct._count.sales > 0 || existingProduct._count.purchases > 0) {
-      // Ao invés de deletar, apenas desativar o produto
-      await prisma.product.update({
-        where: { id: resolvedParams.id },
-        data: { isActive: false }
-      })
-
-      return NextResponse.json({
-        message: 'Produto desativado com sucesso (possui histórico de vendas/compras)'
-      })
-    }
-
-    await prisma.product.delete({
+    // Since we don't have sales/purchases models yet, just delete the item
+    await prisma.inventoryItem.delete({
       where: { id: resolvedParams.id }
     })
 
     return NextResponse.json({
-      message: 'Produto excluído com sucesso'
+      message: 'Item excluído com sucesso'
     })
 
   } catch (error) {

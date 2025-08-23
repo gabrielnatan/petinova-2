@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useState } from "react";
 import { useThemeStyles } from "../../theme-provider";
 import { useDashboard } from "@/store";

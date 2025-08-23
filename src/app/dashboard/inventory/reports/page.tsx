@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -78,11 +78,7 @@ export default function InventoryReportsPage() {
   const [selectedReport, setSelectedReport] = useState<string>("inventory");
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadReportData();
-  }, [selectedReport, dateRange]);
-
-  const loadReportData = async () => {
+  const loadReportData = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -133,7 +129,11 @@ export default function InventoryReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, selectedReport, dateRange]);
+
+  useEffect(() => {
+    loadReportData();
+  }, [loadReportData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

@@ -1,4 +1,3 @@
-//@ts-nocheck
 "use client";
 
 import React from "react";
@@ -47,8 +46,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     { className, variant, size, loading, children, disabled, asChild = false, ...props },
     ref,
   ) => {
-    const Comp = asChild ? Slot : motion.button;
-    
     if (asChild) {
       return (
         <Slot

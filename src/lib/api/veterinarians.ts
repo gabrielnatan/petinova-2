@@ -1,10 +1,3 @@
-interface CRMV {
-  number: string;
-  state: string;
-  issueDate: string;
-  expirationDate: string;
-}
-
 interface Stats {
   totalAppointments?: number;
   totalConsultations?: number;
@@ -16,13 +9,7 @@ interface Veterinarian {
   veterinarian_id: string;
   fullName: string;
   email: string;
-  phoneNumber: string;
-  crmv: CRMV;
-  specialty?: string;
-  yearsOfExperience?: number;
-  availabilitySchedule?: string[];
-  avatarUrl?: string;
-  notes?: string;
+  role: string;
   isActive: boolean;
   clinic_id: string;
   stats?: Stats;
@@ -53,12 +40,12 @@ interface Veterinarian {
       name: string;
       species: string;
       breed?: string;
-    };
-    guardian: {
-      id: string;
-      name: string;
-      email: string;
-      phone: string;
+      guardian: {
+        id: string;
+        name: string;
+        email: string;
+        phone: string;
+      };
     };
   }>;
   created_at: string;
@@ -82,19 +69,9 @@ interface VeterinarianResponse {
 interface CreateVeterinarianData {
   name: string;
   email: string;
-  phone: string;
-  crmv: {
-    number: string;
-    state: string;
-    issueDate: string;
-    expirationDate: string;
-  };
-  specialty?: string;
-  yearsOfExperience?: number;
-  availabilitySchedule?: string[];
-  avatarUrl?: string;
-  notes?: string;
-  isActive?: boolean;
+  password: string;
+  role: 'VETERINARIAN' | 'ASSISTANT';
+  active?: boolean;
 }
 
 type UpdateVeterinarianData = Partial<CreateVeterinarianData>
@@ -196,8 +173,8 @@ class VeterinarianAPI {
     return response.veterinarians;
   }
 
-  async toggleVeterinarianStatus(id: string, isActive: boolean): Promise<VeterinarianResponse> {
-    return this.updateVeterinarian(id, { isActive });
+  async toggleVeterinarianStatus(id: string, active: boolean): Promise<VeterinarianResponse> {
+    return this.updateVeterinarian(id, { active });
   }
 }
 
@@ -208,6 +185,5 @@ export type {
   VeterinarianResponse, 
   CreateVeterinarianData, 
   UpdateVeterinarianData,
-  CRMV,
   Stats
 };

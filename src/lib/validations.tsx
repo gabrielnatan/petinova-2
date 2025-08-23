@@ -93,12 +93,11 @@ export const consultationSchema = z.object({
 
 export const productSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
-  type: z.string().min(1, "Tipo é obrigatório"),
-  unit: z.string().min(1, "Unidade é obrigatória"),
+  description: z.string().optional(),
   quantity: z.number().min(0, "Quantidade deve ser maior ou igual a 0"),
-  costPrice: z.number().min(0, "Preço de custo deve ser maior ou igual a 0"),
-  salePrice: z.number().min(0, "Preço de venda deve ser maior ou igual a 0"),
-  validity: z.date().optional(),
+  price: z.number().min(0, "Preço deve ser maior ou igual a 0").optional(),
+  supplier: z.string().optional(),
+  expiryDate: z.date().optional(),
 });
 
 export type PetFormData = z.infer<typeof petSchema>;

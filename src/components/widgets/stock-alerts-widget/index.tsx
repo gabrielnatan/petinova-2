@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { motion } from "framer-motion";
 import { AlertTriangle, Package } from "lucide-react";
 import { Widget } from "..";

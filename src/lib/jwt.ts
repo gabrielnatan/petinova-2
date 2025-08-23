@@ -38,7 +38,7 @@ export function verifyAccessToken(token: string): JWTPayload | null {
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload
     if (decoded.type !== 'access') return null
     return decoded
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -48,7 +48,7 @@ export function verifyRefreshToken(token: string): JWTPayload | null {
     const decoded = jwt.verify(token, REFRESH_SECRET) as JWTPayload
     if (decoded.type !== 'refresh') return null
     return decoded
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -88,7 +88,7 @@ export async function revokeRefreshToken(token: string): Promise<boolean> {
       data: { isRevoked: true }
     })
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }

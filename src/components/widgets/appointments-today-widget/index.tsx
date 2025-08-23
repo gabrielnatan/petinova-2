@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useAppointments } from "@/store";
 import { motion } from "framer-motion";
 import { Calendar, Clock } from "lucide-react";

@@ -6,18 +6,8 @@ import { z } from 'zod'
 const guardianUpdateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').optional(),
   email: z.string().email('Email inválido').optional(),
-  phone: z.string().min(1, 'Telefone é obrigatório').optional(),
-  cpf: z.string().optional(),
-  address: z.object({
-    street: z.string(),
-    number: z.string(),
-    complement: z.string().optional(),
-    neighborhood: z.string(),
-    city: z.string(),
-    state: z.string(),
-    zipCode: z.string()
-  }).optional(),
-  notes: z.string().optional()
+  phone: z.string().optional(),
+  address: z.string().optional()
 })
 
 // GET /api/guardians/[id] - Buscar guardian específico
@@ -34,8 +24,7 @@ export async function GET(
     const resolvedParams = await params
     const guardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
+        id: resolvedParams.id
       },
       include: {
         pets: {
@@ -72,25 +61,6 @@ export async function GET(
           orderBy: { date: 'desc' },
           take: 10
         },
-        consultations: {
-          include: {
-            pet: {
-              select: {
-                id: true,
-                name: true,
-                species: true
-              }
-            },
-            veterinarian: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 10
-        }
       }
     })
 
@@ -104,10 +74,7 @@ export async function GET(
         fullName: guardian.name,
         email: guardian.email,
         phone: guardian.phone,
-        cpf: guardian.cpf,
         address: guardian.address,
-        notes: guardian.notes,
-        clinic_id: guardian.clinicId,
         pets: guardian.pets.map(pet => ({
           pet_id: pet.id,
           name: pet.name,
@@ -121,7 +88,6 @@ export async function GET(
           created_at: pet.createdAt
         })),
         appointments: guardian.appointments,
-        consultations: guardian.consultations,
         created_at: guardian.createdAt,
         updated_at: guardian.updatedAt
       }
@@ -151,11 +117,10 @@ export async function PUT(
     const body = await request.json()
     const validatedData = guardianUpdateSchema.parse(body)
 
-    // Verificar se o guardian pertence à clínica
+    // Verificar se o guardian existe
     const existingGuardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
+        id: resolvedParams.id
       }
     })
 
@@ -168,14 +133,13 @@ export async function PUT(
       const emailExists = await prisma.guardian.findFirst({
         where: {
           email: validatedData.email,
-          clinicId: user.clinicId,
           id: { not: resolvedParams.id }
         }
       })
 
       if (emailExists) {
         return NextResponse.json(
-          { error: 'Já existe um tutor com este email cadastrado na clínica' },
+          { error: 'Já existe um tutor com este email cadastrado' },
           { status: 400 }
         )
       }
@@ -186,10 +150,8 @@ export async function PUT(
       data: {
         ...(validatedData.name && { name: validatedData.name }),
         ...(validatedData.email && { email: validatedData.email }),
-        ...(validatedData.phone && { phone: validatedData.phone }),
-        ...(validatedData.cpf !== undefined && { cpf: validatedData.cpf }),
-        ...(validatedData.address !== undefined && { address: validatedData.address }),
-        ...(validatedData.notes !== undefined && { notes: validatedData.notes })
+        ...(validatedData.phone !== undefined && { phone: validatedData.phone }),
+        ...(validatedData.address !== undefined && { address: validatedData.address })
       },
       include: {
         _count: {
@@ -207,10 +169,7 @@ export async function PUT(
         fullName: updatedGuardian.name,
         email: updatedGuardian.email,
         phone: updatedGuardian.phone,
-        cpf: updatedGuardian.cpf,
         address: updatedGuardian.address,
-        notes: updatedGuardian.notes,
-        clinic_id: updatedGuardian.clinicId,
         petsCount: updatedGuardian._count.pets,
         created_at: updatedGuardian.createdAt,
         updated_at: updatedGuardian.updatedAt
@@ -245,11 +204,10 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    // Verificar se o guardian pertence à clínica
+    // Verificar se o guardian existe
     const existingGuardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id,
-        clinicId: user.clinicId
+        id: resolvedParams.id
       },
       include: {
         _count: {

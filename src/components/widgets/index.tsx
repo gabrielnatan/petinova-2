@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useThemeStyles } from "../theme-provider";

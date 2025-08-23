@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -15,8 +15,6 @@ import {
   Edit,
   Eye,
   Trash2,
-  Clock,
-  Star,
   ChevronLeft,
   ChevronRight,
   UserCheck,
@@ -257,7 +255,7 @@ export default function VeterinariansListPage() {
     new Set(veterinarians.map(vet => vet.specialty).filter(Boolean))
   );
 
-  const loadVeterinarians = async (page = 1, search = "", specialty = "all", status = "all") => {
+  const loadVeterinarians = useCallback(async (page = 1, search = "", specialty = "all", status = "all") => {
     try {
       setLoading(true);
       setError(null);
@@ -280,11 +278,11 @@ export default function VeterinariansListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadVeterinarians(1);
-  }, []);
+  }, [loadVeterinarians]);
 
   useEffect(() => {
     if (searchDebounce) {
@@ -301,7 +299,7 @@ export default function VeterinariansListPage() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [searchTerm, specialtyFilter, statusFilter]);
+  }, [searchTerm, specialtyFilter, statusFilter, searchDebounce, loadVeterinarians]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

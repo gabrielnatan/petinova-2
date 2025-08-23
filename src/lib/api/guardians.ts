@@ -2,19 +2,8 @@ interface Guardian {
   guardian_id: string;
   fullName: string;
   email: string;
-  phone: string;
-  cpf?: string;
-  address?: {
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  notes?: string;
-  clinic_id: string;
+  phone?: string;
+  address?: string;
   petsCount?: number;
   pets?: Array<{
     pet_id: string;
@@ -43,18 +32,8 @@ interface GuardianResponse {
 interface CreateGuardianData {
   name: string;
   email: string;
-  phone: string;
-  cpf?: string;
-  address?: {
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
-  notes?: string;
+  phone?: string;
+  address?: string;
 }
 
 type UpdateGuardianData = Partial<CreateGuardianData>

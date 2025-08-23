@@ -21,10 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
-import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
-import { appointmentAPI } from "@/lib/api/appointments";
-import { useAuth } from "@/store";
-import { useRouter } from "next/navigation";
+// import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
+// import { appointmentAPI } from "@/lib/api/appointments";
+// import { useAuth } from "@/store";
+// import { useRouter } from "next/navigation";
 
 const paymentMethods = [
   { value: "cash", label: "Dinheiro" },

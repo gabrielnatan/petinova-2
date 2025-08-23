@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { motion } from "framer-motion";
 import { TrendingUp, DollarSign } from "lucide-react";
 import { Widget } from "..";

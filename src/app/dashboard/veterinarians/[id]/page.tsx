@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-//@ts-nocheck
 "use client";
 
 import React, { useState } from "react";

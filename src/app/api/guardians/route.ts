@@ -6,18 +6,8 @@ import { z } from 'zod'
 const guardianCreateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  phone: z.string().min(1, 'Telefone é obrigatório'),
-  cpf: z.string().optional(),
-  address: z.object({
-    street: z.string(),
-    number: z.string(),
-    complement: z.string().optional(),
-    neighborhood: z.string(),
-    city: z.string(),
-    state: z.string(),
-    zipCode: z.string()
-  }).optional(),
-  notes: z.string().optional()
+  phone: z.string().optional(),
+  address: z.string().optional()
 })
 
 // GET /api/guardians - Listar guardians
@@ -36,7 +26,6 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where = {
-      clinicId: user.clinicId,
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -78,10 +67,7 @@ export async function GET(request: NextRequest) {
         fullName: guardian.name,
         email: guardian.email,
         phone: guardian.phone,
-        cpf: guardian.cpf,
         address: guardian.address,
-        notes: guardian.notes,
-        clinic_id: guardian.clinicId,
         petsCount: guardian._count.pets,
         pets: guardian.pets.map(pet => ({
           pet_id: pet.id,
@@ -120,17 +106,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = guardianCreateSchema.parse(body)
 
-    // Verificar se já existe guardian com o mesmo email na clínica
+    // Verificar se já existe guardian com o mesmo email
     const existingGuardian = await prisma.guardian.findFirst({
       where: {
-        email: validatedData.email,
-        clinicId: user.clinicId
+        email: validatedData.email
       }
     })
 
     if (existingGuardian) {
       return NextResponse.json(
-        { error: 'Já existe um tutor com este email cadastrado na clínica' },
+        { error: 'Já existe um tutor com este email cadastrado' },
         { status: 400 }
       )
     }
@@ -139,11 +124,8 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         email: validatedData.email,
-        phone: validatedData.phone,
-        cpf: validatedData.cpf,
-        address: validatedData.address,
-        notes: validatedData.notes,
-        clinicId: user.clinicId
+        ...(validatedData.phone && { phone: validatedData.phone }),
+        ...(validatedData.address && { address: validatedData.address })
       },
       include: {
         _count: {
@@ -161,10 +143,7 @@ export async function POST(request: NextRequest) {
         fullName: guardian.name,
         email: guardian.email,
         phone: guardian.phone,
-        cpf: guardian.cpf,
         address: guardian.address,
-        notes: guardian.notes,
-        clinic_id: guardian.clinicId,
         petsCount: guardian._count.pets,
         created_at: guardian.createdAt,
         updated_at: guardian.updatedAt

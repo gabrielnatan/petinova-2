@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Save, User, Mail, Phone, Award, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Save, User, Mail, Phone, Award, Clock } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +62,6 @@ export default function NewVeterinarianPage() {
   const {
     register,
     handleSubmit,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<VeterinarianFormData>({
     resolver: zodResolver(veterinarianSchema)

@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
       monthlyRevenue
     ] = await Promise.all([
       prisma.pet.count({ where: { clinicId: user.clinicId } }),
-      prisma.guardian.count({ where: { clinicId: user.clinicId } }),
-      prisma.veterinarian.count({ where: { clinicId: user.clinicId } }),
+      prisma.guardian.count(),
+      prisma.user.count({ where: { role: 'VETERINARIAN' } }),
       prisma.appointment.count({ where: { pet: { clinicId: user.clinicId } } }),
       // Calcular receita do mês atual (simplificado)
       prisma.consultation.count({
@@ -90,17 +90,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       clinic: {
         clinic_id: clinic.id,
-        name: clinic.name,
+        name: clinic.tradeName,
         cnpj: clinic.cnpj,
         email: clinic.email,
         phone: clinic.phone,
         address: clinic.address,
-        businessHours: clinic.businessHours,
-        services: clinic.services,
-        logo: clinic.logo,
-        website: clinic.website,
-        socialMedia: clinic.socialMedia,
-        notifications: clinic.notifications,
+        businessHours: null, // Not in schema
+        services: [], // Not in schema
+        logo: null, // Not in schema
+        website: null, // Not in schema
+        socialMedia: {}, // Not in schema
+        notifications: {}, // Not in schema
+        isActive: clinic.isActive,
+        legalName: clinic.legalName,
         stats: {
           totalPets,
           totalGuardians,
@@ -162,17 +164,14 @@ export async function PUT(request: NextRequest) {
     const updatedClinic = await prisma.clinic.update({
       where: { id: user.clinicId },
       data: {
-        name: validatedData.name,
+        tradeName: validatedData.name,
+        legalName: validatedData.name,
         cnpj: validatedData.cnpj,
         email: validatedData.email,
         phone: validatedData.phone,
-        address: validatedData.address,
-        businessHours: validatedData.businessHours,
-        services: validatedData.services || [],
-        logo: validatedData.logo,
-        website: validatedData.website,
-        socialMedia: validatedData.socialMedia || {},
-        notifications: validatedData.notifications || {}
+        address: typeof validatedData.address === 'string' 
+          ? validatedData.address 
+          : JSON.stringify(validatedData.address)
       }
     })
 
@@ -180,17 +179,19 @@ export async function PUT(request: NextRequest) {
       message: 'Configurações da clínica atualizadas com sucesso',
       clinic: {
         clinic_id: updatedClinic.id,
-        name: updatedClinic.name,
+        name: updatedClinic.tradeName,
+        legalName: updatedClinic.legalName,
         cnpj: updatedClinic.cnpj,
         email: updatedClinic.email,
         phone: updatedClinic.phone,
         address: updatedClinic.address,
-        businessHours: updatedClinic.businessHours,
-        services: updatedClinic.services,
-        logo: updatedClinic.logo,
-        website: updatedClinic.website,
-        socialMedia: updatedClinic.socialMedia,
-        notifications: updatedClinic.notifications,
+        businessHours: null, // Not in schema
+        services: [], // Not in schema
+        logo: null, // Not in schema
+        website: null, // Not in schema
+        socialMedia: {}, // Not in schema
+        notifications: {}, // Not in schema
+        isActive: updatedClinic.isActive,
         created_at: updatedClinic.createdAt,
         updated_at: updatedClinic.updatedAt
       }

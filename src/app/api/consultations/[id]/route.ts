@@ -4,23 +4,9 @@ import { getUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
 const consultationUpdateSchema = z.object({
-  diagnosis: z.string().min(1, 'Diagnóstico é obrigatório').optional(),
-  treatment: z.string().min(1, 'Tratamento é obrigatório').optional(),
-  prescription: z.string().optional(),
-  notes: z.string().optional(),
-  followUpDate: z.string().optional().transform(str => str ? new Date(str) : undefined),
-  weight: z.number().positive('Peso deve ser positivo').optional(),
-  temperature: z.number().positive('Temperatura deve ser positiva').optional(),
-  heartRate: z.number().positive('Frequência cardíaca deve ser positiva').optional(),
-  respiratoryRate: z.number().positive('Frequência respiratória deve ser positiva').optional(),
-  bloodPressure: z.string().optional(),
-  symptoms: z.array(z.string()).optional(),
-  attachments: z.array(z.object({
-    name: z.string(),
-    url: z.string(),
-    type: z.string()
-  })).optional(),
-  status: z.enum(['IN_PROGRESS', 'COMPLETED']).optional()
+  diagnosis: z.string().optional(),
+  treatment: z.string().optional(),
+  notes: z.string().optional()
 })
 
 // GET /api/consultations/[id] - Buscar consulta específica
@@ -151,17 +137,7 @@ export async function PUT(
       data: {
         ...(validatedData.diagnosis !== undefined && { diagnosis: validatedData.diagnosis }),
         ...(validatedData.treatment !== undefined && { treatment: validatedData.treatment }),
-        ...(validatedData.prescription !== undefined && { prescription: validatedData.prescription }),
-        ...(validatedData.notes !== undefined && { notes: validatedData.notes }),
-        ...(validatedData.followUpDate !== undefined && { followUpDate: validatedData.followUpDate }),
-        ...(validatedData.weight !== undefined && { weight: validatedData.weight }),
-        ...(validatedData.temperature !== undefined && { temperature: validatedData.temperature }),
-        ...(validatedData.heartRate !== undefined && { heartRate: validatedData.heartRate }),
-        ...(validatedData.respiratoryRate !== undefined && { respiratoryRate: validatedData.respiratoryRate }),
-        ...(validatedData.bloodPressure !== undefined && { bloodPressure: validatedData.bloodPressure }),
-        ...(validatedData.symptoms !== undefined && { symptoms: validatedData.symptoms }),
-        ...(validatedData.attachments !== undefined && { attachments: validatedData.attachments }),
-        ...(validatedData.status !== undefined && { status: validatedData.status })
+        ...(validatedData.notes !== undefined && { notes: validatedData.notes })
       },
       include: {
         pet: {
@@ -170,31 +146,22 @@ export async function PUT(
             name: true,
             species: true,
             breed: true,
-            avatarUrl: true
+            avatarUrl: true,
+            guardian: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true
+              }
+            }
           }
         },
         veterinarian: {
           select: {
             id: true,
             name: true,
-            role: true,
-            crmv: true
-          }
-        },
-        guardian: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
-        appointment: {
-          select: {
-            id: true,
-            date: true,
-            time: true,
-            status: true
+            role: true
           }
         }
       }
@@ -206,23 +173,11 @@ export async function PUT(
         consultation_id: updatedConsultation.id,
         pet: updatedConsultation.pet,
         veterinarian: updatedConsultation.veterinarian,
-        guardian: updatedConsultation.guardian,
-        appointment: updatedConsultation.appointment,
+        guardian: updatedConsultation.pet.guardian,
         diagnosis: updatedConsultation.diagnosis,
         treatment: updatedConsultation.treatment,
-        prescription: updatedConsultation.prescription,
         notes: updatedConsultation.notes,
-        followUpDate: updatedConsultation.followUpDate,
-        vitalSigns: {
-          weight: updatedConsultation.weight,
-          temperature: updatedConsultation.temperature,
-          heartRate: updatedConsultation.heartRate,
-          respiratoryRate: updatedConsultation.respiratoryRate,
-          bloodPressure: updatedConsultation.bloodPressure
-        },
-        symptoms: updatedConsultation.symptoms,
-        attachments: updatedConsultation.attachments,
-        status: updatedConsultation.status,
+        date: updatedConsultation.date,
         created_at: updatedConsultation.createdAt,
         updated_at: updatedConsultation.updatedAt
       }

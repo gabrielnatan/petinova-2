@@ -1,28 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
   Search,
   Package,
   TrendingDown,
-  TrendingUp,
   AlertTriangle,
   MoreVertical,
   Edit,
   Eye,
   Trash2,
   BarChart3,
-  Package2,
   DollarSign,
-  ExternalLink,
   AlertCircle,
-  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -227,7 +223,6 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-  const [activeTab, setActiveTab] = useState<"products" | "movements">("products");
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 12,
@@ -243,12 +238,7 @@ export default function InventoryPage() {
 
   const router = useRouter();
 
-  useEffect(() => {
-    loadProducts();
-    loadStats();
-  }, [pagination.page, searchTerm, categoryFilter, statusFilter]);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -274,9 +264,9 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchTerm, categoryFilter, statusFilter]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const report = await productAPI.getInventoryReport();
       setStats({
@@ -288,7 +278,13 @@ export default function InventoryPage() {
     } catch (err) {
       console.error('Erro ao carregar estatísticas:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
+    loadStats();
+  }, [loadProducts, loadStats]);
+
 
   const handleDelete = async (productId: string) => {
     try {

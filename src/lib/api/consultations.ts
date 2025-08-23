@@ -1,17 +1,3 @@
-interface VitalSigns {
-  weight?: number;
-  temperature?: number;
-  heartRate?: number;
-  respiratoryRate?: number;
-  bloodPressure?: string;
-}
-
-interface Attachment {
-  name: string;
-  url: string;
-  type: string;
-}
-
 interface Consultation {
   consultation_id: string;
   pet: {
@@ -20,55 +6,31 @@ interface Consultation {
     species: string;
     breed?: string;
     avatarUrl?: string;
-    birthDate?: string;
-    weight?: number;
-    microchipNumber?: string;
   };
   veterinarian: {
     id: string;
     name: string;
-    specialty?: string;
-    crmv: {
-      number: string;
-      state: string;
-      issueDate: string;
-      expirationDate: string;
-    };
-    email?: string;
-    phone?: string;
+    role: string;
   };
   guardian: {
     id: string;
     name: string;
     email: string;
     phone: string;
-    address?: string;
   };
-  appointment?: {
-    id: string;
-    date: string;
-    time: string;
-    status: string;
-    reason?: string;
-  };
-  diagnosis: string;
-  treatment: string;
-  prescription?: string;
+  diagnosis?: string;
+  treatment?: string;
   notes?: string;
-  followUpDate?: string;
-  vitalSigns: VitalSigns;
-  symptoms?: string[];
-  attachments?: Attachment[];
-  status: 'IN_PROGRESS' | 'COMPLETED';
+  date: string;
   petHistory?: Array<{
     id: string;
     date: string;
-    diagnosis: string;
-    treatment: string;
+    diagnosis?: string;
+    treatment?: string;
     veterinarian: {
       id: string;
       name: string;
-      specialty?: string;
+      role: string;
     };
   }>;
   created_at: string;
@@ -92,24 +54,12 @@ interface ConsultationResponse {
 interface CreateConsultationData {
   petId: string;
   veterinarianId: string;
-  guardianId: string;
-  appointmentId?: string;
-  diagnosis: string;
-  treatment: string;
-  prescription?: string;
+  diagnosis?: string;
+  treatment?: string;
   notes?: string;
-  followUpDate?: string;
-  weight?: number;
-  temperature?: number;
-  heartRate?: number;
-  respiratoryRate?: number;
-  bloodPressure?: string;
-  symptoms?: string[];
-  attachments?: Attachment[];
-  status?: 'IN_PROGRESS' | 'COMPLETED';
 }
 
-type UpdateConsultationData = Partial<Omit<CreateConsultationData, 'petId' | 'veterinarianId' | 'guardianId' | 'appointmentId'>>
+type UpdateConsultationData = Partial<Omit<CreateConsultationData, 'petId' | 'veterinarianId'>>
 
 class ConsultationAPI {
   private baseURL = '/api/consultations';
@@ -120,7 +70,6 @@ class ConsultationAPI {
     search?: string;
     veterinarianId?: string;
     petId?: string;
-    guardianId?: string;
     status?: string;
     startDate?: string;
     endDate?: string;
@@ -132,7 +81,6 @@ class ConsultationAPI {
     if (params?.search) searchParams.append('search', params.search);
     if (params?.veterinarianId) searchParams.append('veterinarianId', params.veterinarianId);
     if (params?.petId) searchParams.append('petId', params.petId);
-    if (params?.guardianId) searchParams.append('guardianId', params.guardianId);
     if (params?.status) searchParams.append('status', params.status);
     if (params?.startDate) searchParams.append('startDate', params.startDate);
     if (params?.endDate) searchParams.append('endDate', params.endDate);
@@ -221,10 +169,6 @@ class ConsultationAPI {
     return response.consultations;
   }
 
-  async getConsultationsByGuardian(guardianId: string): Promise<Consultation[]> {
-    const response = await this.getConsultations({ guardianId, limit: 100 });
-    return response.consultations;
-  }
 
   async getConsultationsByDateRange(startDate: string, endDate: string): Promise<Consultation[]> {
     const response = await this.getConsultations({ startDate, endDate, limit: 100 });
@@ -236,15 +180,6 @@ class ConsultationAPI {
     return response.consultations;
   }
 
-  async getInProgressConsultations(): Promise<Consultation[]> {
-    const response = await this.getConsultations({ status: 'IN_PROGRESS', limit: 100 });
-    return response.consultations;
-  }
-
-  async getCompletedConsultations(): Promise<Consultation[]> {
-    const response = await this.getConsultations({ status: 'COMPLETED', limit: 100 });
-    return response.consultations;
-  }
 
   // Método para gerar relatórios
   async getConsultationReport(params?: {
@@ -273,10 +208,12 @@ class ConsultationAPI {
     
     consultations.consultations.forEach(consultation => {
       // Contagem de diagnósticos
-      if (diagnosisCount[consultation.diagnosis]) {
-        diagnosisCount[consultation.diagnosis]++;
-      } else {
-        diagnosisCount[consultation.diagnosis] = 1;
+      if (consultation.diagnosis) {
+        if (diagnosisCount[consultation.diagnosis]) {
+          diagnosisCount[consultation.diagnosis]++;
+        } else {
+          diagnosisCount[consultation.diagnosis] = 1;
+        }
       }
       
       // Contagem mensal
@@ -316,7 +253,5 @@ export type {
   ConsultationListResponse, 
   ConsultationResponse, 
   CreateConsultationData, 
-  UpdateConsultationData,
-  VitalSigns,
-  Attachment
+  UpdateConsultationData
 };

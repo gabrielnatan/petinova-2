@@ -1,4 +1,3 @@
-//@ts-nocheck
 import { useThemeStyles } from "@/components/theme-provider";
 import { motion } from "framer-motion";
 import { Calendar, Heart, FileText, Package } from "lucide-react";

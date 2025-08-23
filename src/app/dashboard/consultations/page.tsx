@@ -1,31 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
   Search,
   FileText,
   Calendar,
-  DollarSign,
   Heart,
   User,
   Stethoscope,
   CheckCircle,
-  XCircle,
   Clock,
   MoreVertical,
   Edit,
   Receipt,
-  FileSpreadsheet,
-  Filter,
   Eye,
   Trash2,
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -34,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { consultationAPI, type Consultation } from "@/lib/api/consultations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -220,11 +216,7 @@ export default function ConsultationsListPage() {
   
   const router = useRouter();
 
-  useEffect(() => {
-    loadConsultations();
-  }, [pagination.page, searchTerm, statusFilter, veterinarianFilter]);
-
-  const loadConsultations = async () => {
+  const loadConsultations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -247,7 +239,11 @@ export default function ConsultationsListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, pagination.limit, searchTerm, statusFilter, veterinarianFilter]);
+
+  useEffect(() => {
+    loadConsultations();
+  }, [loadConsultations]);
 
   const handleDelete = async (consultationId: string) => {
     try {

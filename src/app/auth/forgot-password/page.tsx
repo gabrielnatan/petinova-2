@@ -1,4 +1,3 @@
-//@ts-nocheck
 "use client";
 import { useThemeStyles } from "@/components/theme-provider";
 import { AuthRedirect } from "@/components/auth-redirect";

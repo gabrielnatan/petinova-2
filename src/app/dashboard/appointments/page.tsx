@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -17,7 +17,6 @@ import {
   Check,
   Stethoscope,
   Eye,
-  Filter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -313,7 +312,7 @@ export default function AppointmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -333,11 +332,11 @@ export default function AppointmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDate]);
 
   useEffect(() => {
     loadAppointments();
-  }, [selectedDate]);
+  }, [selectedDate, loadAppointments]);
 
   const dayAppointments = appointments
     .filter((app) => isSameDay(parseISO(app.dateTime), selectedDate))

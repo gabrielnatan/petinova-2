@@ -1,7 +1,6 @@
-//@ts-nocheck
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo } from "react";
 import { useThemeStorage } from "@/hooks/use-theme-storage";
 
 export type Theme = "light" | "dark" | "monochromatic";
@@ -34,7 +33,7 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [mounted, setMounted] = useState(false);
   const { saveTheme, getTheme } = useThemeStorage();
-  const availableThemes: Theme[] = ["light", "dark", "monochromatic"];
+  const availableThemes = useMemo((): Theme[] => ["light", "dark", "monochromatic"], []);
   
   // Simple theme state - always start with default for SSR
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
@@ -70,7 +69,7 @@ export function ThemeProvider({
     
     // Set state only if different
     setThemeState(initialTheme);
-  }, []); // Empty dependency array - run once only
+  }, [availableThemes, defaultTheme, getTheme]); // Add dependencies
 
   // Separate effect for theme changes (after mount)
   useEffect(() => {

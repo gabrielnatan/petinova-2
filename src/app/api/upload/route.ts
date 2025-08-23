@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     // Criar diretório se não existir
     try {
       await mkdir(uploadDir, { recursive: true })
-    } catch (error) {
+    } catch {
       // Diretório já existe
     }
 
@@ -124,9 +124,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const entityId = searchParams.get('entityId')
-    const entityType = searchParams.get('entityType')
-    const folder = searchParams.get('folder')
+    // const entityId = searchParams.get('entityId')
+    // const entityType = searchParams.get('entityType')
+    // const folder = searchParams.get('folder')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
 

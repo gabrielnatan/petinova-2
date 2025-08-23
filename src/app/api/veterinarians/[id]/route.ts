@@ -6,19 +6,8 @@ import { z } from 'zod'
 const veterinarianUpdateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório').optional(),
   email: z.string().email('Email inválido').optional(),
-  phone: z.string().min(1, 'Telefone é obrigatório').optional(),
-  crmv: z.object({
-    number: z.string().min(1, 'Número do CRMV é obrigatório'),
-    state: z.string().min(2, 'Estado é obrigatório').max(2, 'Estado deve ter 2 caracteres'),
-    issueDate: z.string().transform((str) => new Date(str)),
-    expirationDate: z.string().transform((str) => new Date(str))
-  }).optional(),
-  specialty: z.string().optional(),
-  yearsOfExperience: z.number().min(0, 'Anos de experiência deve ser positivo').optional(),
-  availabilitySchedule: z.array(z.string()).optional(),
-  avatarUrl: z.string().url().optional().or(z.literal('')),
-  notes: z.string().optional(),
-  isActive: z.boolean().optional()
+  role: z.enum(['VETERINARIAN', 'ASSISTANT']).optional(),
+  active: z.boolean().optional()
 })
 
 // GET /api/veterinarians/[id] - Buscar veterinário específico
@@ -33,10 +22,11 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const veterinarian = await prisma.veterinarian.findFirst({
+    const veterinarian = await prisma.user.findFirst({
       where: {
         id: resolvedParams.id,
-        clinicId: user.clinicId
+        clinicId: user.clinicId,
+        role: 'VETERINARIAN'
       },
       include: {
         appointments: {
@@ -68,15 +58,15 @@ export async function GET(
                 id: true,
                 name: true,
                 species: true,
-                breed: true
-              }
-            },
-            guardian: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true
+                breed: true,
+                guardian: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true
+                  }
+                }
               }
             }
           },
@@ -126,14 +116,8 @@ export async function GET(
         veterinarian_id: veterinarian.id,
         fullName: veterinarian.name,
         email: veterinarian.email,
-        phoneNumber: veterinarian.phone,
-        crmv: veterinarian.crmv,
-        specialty: veterinarian.specialty,
-        yearsOfExperience: veterinarian.yearsOfExperience,
-        availabilitySchedule: veterinarian.availabilitySchedule,
-        avatarUrl: veterinarian.avatarUrl,
-        notes: veterinarian.notes,
-        isActive: veterinarian.isActive,
+        role: veterinarian.role,
+        isActive: veterinarian.active,
         clinic_id: veterinarian.clinicId,
         appointments: veterinarian.appointments,
         consultations: veterinarian.consultations,
@@ -172,11 +156,12 @@ export async function PUT(
     const body = await request.json()
     const validatedData = veterinarianUpdateSchema.parse(body)
 
-    // Verificar se o veterinário pertence à clínica
-    const existingVeterinarian = await prisma.veterinarian.findFirst({
+    // Verificar se o usuário pertence à clínica
+    const existingVeterinarian = await prisma.user.findFirst({
       where: {
         id: resolvedParams.id,
-        clinicId: user.clinicId
+        clinicId: user.clinicId,
+        role: 'VETERINARIAN'
       }
     })
 
@@ -184,57 +169,29 @@ export async function PUT(
       return NextResponse.json({ error: 'Veterinário não encontrado' }, { status: 404 })
     }
 
-    // Se email foi fornecido, verificar se já existe outro veterinário com o mesmo email
+    // Se email foi fornecido, verificar se já existe outro usuário com o mesmo email
     if (validatedData.email && validatedData.email !== existingVeterinarian.email) {
-      const emailExists = await prisma.veterinarian.findFirst({
+      const emailExists = await prisma.user.findUnique({
         where: {
-          email: validatedData.email,
-          clinicId: user.clinicId,
-          id: { not: resolvedParams.id }
+          email: validatedData.email
         }
       })
 
-      if (emailExists) {
+      if (emailExists && emailExists.id !== resolvedParams.id) {
         return NextResponse.json(
-          { error: 'Já existe um veterinário com este email cadastrado na clínica' },
+          { error: 'Já existe um usuário com este email cadastrado' },
           { status: 400 }
         )
       }
     }
 
-    // Se CRMV foi fornecido, verificar se já existe outro veterinário com o mesmo CRMV
-    if (validatedData.crmv) {
-      const crmvExists = await prisma.veterinarian.findFirst({
-        where: {
-          crmv: {
-            path: ['number'],
-            equals: validatedData.crmv.number
-          },
-          id: { not: resolvedParams.id }
-        }
-      })
-
-      if (crmvExists) {
-        return NextResponse.json(
-          { error: 'Já existe um veterinário com este CRMV cadastrado' },
-          { status: 400 }
-        )
-      }
-    }
-
-    const updatedVeterinarian = await prisma.veterinarian.update({
+    const updatedVeterinarian = await prisma.user.update({
       where: { id: resolvedParams.id },
       data: {
         ...(validatedData.name && { name: validatedData.name }),
         ...(validatedData.email && { email: validatedData.email }),
-        ...(validatedData.phone && { phone: validatedData.phone }),
-        ...(validatedData.crmv && { crmv: validatedData.crmv }),
-        ...(validatedData.specialty !== undefined && { specialty: validatedData.specialty }),
-        ...(validatedData.yearsOfExperience !== undefined && { yearsOfExperience: validatedData.yearsOfExperience }),
-        ...(validatedData.availabilitySchedule !== undefined && { availabilitySchedule: validatedData.availabilitySchedule }),
-        ...(validatedData.avatarUrl !== undefined && { avatarUrl: validatedData.avatarUrl }),
-        ...(validatedData.notes !== undefined && { notes: validatedData.notes }),
-        ...(validatedData.isActive !== undefined && { isActive: validatedData.isActive })
+        ...(validatedData.role && { role: validatedData.role }),
+        ...(validatedData.active !== undefined && { active: validatedData.active })
       },
       include: {
         _count: {
@@ -252,14 +209,8 @@ export async function PUT(
         veterinarian_id: updatedVeterinarian.id,
         fullName: updatedVeterinarian.name,
         email: updatedVeterinarian.email,
-        phoneNumber: updatedVeterinarian.phone,
-        crmv: updatedVeterinarian.crmv,
-        specialty: updatedVeterinarian.specialty,
-        yearsOfExperience: updatedVeterinarian.yearsOfExperience,
-        availabilitySchedule: updatedVeterinarian.availabilitySchedule,
-        avatarUrl: updatedVeterinarian.avatarUrl,
-        notes: updatedVeterinarian.notes,
-        isActive: updatedVeterinarian.isActive,
+        role: updatedVeterinarian.role,
+        isActive: updatedVeterinarian.active,
         clinic_id: updatedVeterinarian.clinicId,
         stats: {
           totalAppointments: updatedVeterinarian._count.appointments,
@@ -298,11 +249,12 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    // Verificar se o veterinário pertence à clínica
-    const existingVeterinarian = await prisma.veterinarian.findFirst({
+    // Verificar se o usuário pertence à clínica
+    const existingVeterinarian = await prisma.user.findFirst({
       where: {
         id: resolvedParams.id,
-        clinicId: user.clinicId
+        clinicId: user.clinicId,
+        role: 'VETERINARIAN'
       },
       include: {
         _count: {
@@ -334,10 +286,10 @@ export async function DELETE(
 
     // Verificar se o veterinário tem consultas realizadas
     if (existingVeterinarian._count.consultations > 0) {
-      // Ao invés de deletar, apenas desativar o veterinário
-      await prisma.veterinarian.update({
+      // Ao invés de deletar, apenas desativar o usuário
+      await prisma.user.update({
         where: { id: resolvedParams.id },
-        data: { isActive: false }
+        data: { active: false }
       })
 
       return NextResponse.json({
@@ -345,7 +297,7 @@ export async function DELETE(
       })
     }
 
-    await prisma.veterinarian.delete({
+    await prisma.user.delete({
       where: { id: resolvedParams.id }
     })
 
