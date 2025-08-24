@@ -24,7 +24,8 @@ export async function GET(
     const resolvedParams = await params
     const guardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id
+        id: resolvedParams.id,
+        clinicId: user.clinicId
       },
       include: {
         pets: {
@@ -120,7 +121,8 @@ export async function PUT(
     // Verificar se o guardian existe
     const existingGuardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id
+        id: resolvedParams.id,
+        clinicId: user.clinicId
       }
     })
 
@@ -207,7 +209,8 @@ export async function DELETE(
     // Verificar se o guardian existe
     const existingGuardian = await prisma.guardian.findFirst({
       where: {
-        id: resolvedParams.id
+        id: resolvedParams.id,
+        clinicId: user.clinicId
       },
       include: {
         _count: {

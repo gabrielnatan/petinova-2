@@ -234,7 +234,7 @@ export default function GuardiansListPage() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [searchTerm, searchDebounce, loadGuardians]);
+  }, [searchTerm, loadGuardians]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

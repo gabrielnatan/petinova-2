@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -14,46 +14,29 @@ import {
   Eye,
   Trash2,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-
-interface Pet {
-  pet_id: string;
-  name: string;
-  species: string;
-  breed: string;
-  size: string;
-  weight: number;
-  isNeutered: boolean;
-  environment: string;
-  birthDate: string;
-  avatarUrl: string | null;
-  guardian: { name: string; phone: string };
-  guardian_id: string;
-  clinic_id: string;
-  createdAt: string;
-}
-
-interface PetsResponse {
-  pets: Pet[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
+import { petAPI, type Pet } from "@/lib/api/pets";
 
 function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }) {
   const [showMenu, setShowMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const getAgeText = (birthDate: string) => {
+  const getAgeText = (birthDate?: string) => {
+    if (!birthDate) return 'Idade não informada';
+    
     const today = new Date();
     const birth = new Date(birthDate);
+    
+    if (isNaN(birth.getTime())) {
+      return 'Data inválida';
+    }
+    
     const diffTime = Math.abs(today.getTime() - birth.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const years = Math.floor(diffDays / 365);
@@ -71,23 +54,12 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
     
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(`/api/pets/${pet.pet_id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        onDelete(pet.pet_id);
-        setShowMenu(false);
-      } else {
-        alert("Erro ao excluir pet");
-      }
+      await petAPI.deletePet(pet.pet_id);
+      onDelete(pet.pet_id);
+      setShowMenu(false);
     } catch (error) {
       console.error("Erro ao excluir pet:", error);
-      alert("Erro ao excluir pet");
+      alert(error instanceof Error ? error.message : "Erro ao excluir pet");
     } finally {
       setIsDeleting(false);
     }
@@ -176,7 +148,7 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-secondary">Peso:</span>
-              <span className="text-text-primary">{pet.weight}kg</span>
+              <span className="text-text-primary">{pet.weight ? `${pet.weight}kg` : 'Não informado'}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-text-secondary">Castrado:</span>
@@ -191,7 +163,7 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
           <div className="border-t border-border pt-3">
             <div className="flex items-center space-x-2 text-sm text-text-secondary">
               <User className="w-4 h-4" />
-              <span>{pet.guardian.name}</span>
+              <span>{pet.guardian?.fullName || 'Tutor não informado'}</span>
             </div>
           </div>
         </CardContent>
@@ -205,54 +177,77 @@ export default function PetsListPage() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState({ total: 0, dogs: 0, cats: 0 });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 12,
+    total: 0,
+    pages: 0
+  });
+  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
 
-  const fetchPets = async (search?: string) => {
+  const loadPets = useCallback(async (page = 1, search = "") => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("accessToken");
-      const url = `/api/pets${search ? `?search=${encodeURIComponent(search)}` : ""}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      setError(null);
+      const response = await petAPI.getPets({
+        page,
+        limit: 12,
+        search: search.trim() || undefined
       });
-
-      if (!response.ok) {
-        throw new Error("Erro ao carregar pets");
-      }
-
-      const data: PetsResponse = await response.json();
-      setPets(data.pets);
-      
-      // Calculate stats
-      const total = data.pets.length;
-      const dogs = data.pets.filter(pet => pet.species === "Cão").length;
-      const cats = data.pets.filter(pet => pet.species === "Gato").length;
-      setStats({ total, dogs, cats });
-      
+      setPets(response.pets);
+      setPagination(response.pagination);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
+      setError(err instanceof Error ? err.message : 'Erro ao carregar pets');
+      setPets([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchPets();
   }, []);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      fetchPets(searchTerm);
-    }, 300);
+    loadPets(1);
+  }, [loadPets]);
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  useEffect(() => {
+    if (searchDebounce) {
+      clearTimeout(searchDebounce);
+    }
+
+    const timeout = setTimeout(() => {
+      setCurrentPage(1);
+      loadPets(1, searchTerm);
+    }, 500);
+
+    setSearchDebounce(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [searchTerm, loadPets]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    loadPets(page, searchTerm);
+  };
 
   const handleDeletePet = (petId: string) => {
     setPets(prev => prev.filter(pet => pet.pet_id !== petId));
+    // Atualizar stats
+    if (pagination.total > 0) {
+      setPagination(prev => ({
+        ...prev,
+        total: prev.total - 1
+      }));
+    }
+  };
+
+  // Calculate stats from current pets
+  const stats = {
+    total: pagination.total,
+    dogs: pets.filter(pet => pet.species.toLowerCase().includes('cão') || pet.species.toLowerCase().includes('dog')).length,
+    cats: pets.filter(pet => pet.species.toLowerCase().includes('gato') || pet.species.toLowerCase().includes('cat')).length,
+    consultationsToday: 5 // Mock data - would come from a separate API
   };
 
   return (
@@ -342,7 +337,7 @@ export default function PetsListPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-text-secondary">Consultas Hoje</p>
-                <p className="text-2xl font-bold text-text-primary">5</p>
+                <p className="text-2xl font-bold text-text-primary">{stats.consultationsToday}</p>
               </div>
               <Calendar className="w-8 h-8 text-warning" />
             </div>
@@ -360,7 +355,7 @@ export default function PetsListPage() {
             Erro ao carregar pets
           </h3>
           <p className="text-text-secondary mb-4">{error}</p>
-          <Button onClick={() => fetchPets(searchTerm)}>
+          <Button onClick={() => loadPets(currentPage, searchTerm)}>
             Tentar Novamente
           </Button>
         </div>
@@ -397,18 +392,66 @@ export default function PetsListPage() {
 
       {/* Pets Grid */}
       {!loading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {pets.map((pet, index) => (
-            <motion.div
-              key={pet.pet_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <PetCard pet={pet} onDelete={handleDeletePet} />
-            </motion.div>
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pets.map((pet, index) => (
+              <motion.div
+                key={pet.pet_id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <PetCard pet={pet} onDelete={handleDeletePet} />
+              </motion.div>
+            ))}
+          </div>
+          
+          {pagination.pages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <div className="text-sm text-text-secondary">
+                Mostrando {((currentPage - 1) * pagination.limit) + 1} até {Math.min(currentPage * pagination.limit, pagination.total)} de {pagination.total} pets
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage <= 1 || loading}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Anterior
+                </Button>
+                
+                {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                  const page = i + Math.max(1, currentPage - 2);
+                  if (page > pagination.pages) return null;
+                  
+                  return (
+                    <Button
+                      key={page}
+                      variant={currentPage === page ? "primary" : "secondary"}
+                      size="sm"
+                      onClick={() => handlePageChange(page)}
+                      disabled={loading}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+                
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage >= pagination.pages || loading}
+                >
+                  Próximo
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Empty State */}

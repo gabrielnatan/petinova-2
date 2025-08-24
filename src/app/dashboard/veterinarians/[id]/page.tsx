@@ -115,11 +115,11 @@ const mockVeterinarian = {
   },
 };
 
-const formatCRMV = (crmv) => {
+const formatCRMV = (crmv: any) => {
   return `${crmv.number}/${crmv.state}`;
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (date: Date) => {
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -129,7 +129,7 @@ const formatDateTime = (date) => {
   });
 };
 
-const formatDate = (date) => {
+const formatDate = (date: Date) => {
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -137,11 +137,11 @@ const formatDate = (date) => {
   });
 };
 
-const formatPhone = (phone) => {
+const formatPhone = (phone: string) => {
   return phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
 };
 
-const getDayName = (day) => {
+const getDayName = (day: string) => {
   const days = {
     Monday: "Segunda",
     Tuesday: "Terça",
@@ -151,10 +151,10 @@ const getDayName = (day) => {
     Saturday: "Sábado",
     Sunday: "Domingo",
   };
-  return days[day] || day;
+  return (days as any)[day] || day;
 };
 
-export default function VeterinarianDetailPage({ params }) {
+export default function VeterinarianDetailPage({ params }: { params: any }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [showActions, setShowActions] = useState(false);
 

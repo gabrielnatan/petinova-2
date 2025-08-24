@@ -135,11 +135,11 @@ export default function EditVeterinarianPage({ params }:{ params:any }) {
 
   const [specialties, setSpecialties] = useState(mockVeterinarian.specialties);
   const [schedule, setSchedule] = useState(mockVeterinarian.weeklySchedule);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
@@ -147,28 +147,28 @@ export default function EditVeterinarianPage({ params }:{ params:any }) {
     }
   };
 
-  const addSpecialty = (specialty) => {
+  const addSpecialty = (specialty: string) => {
     if (!specialties.includes(specialty)) {
       setSpecialties((prev) => [...prev, specialty]);
     }
   };
 
-  const removeSpecialty = (specialty) => {
+  const removeSpecialty = (specialty: string) => {
     setSpecialties((prev) => prev.filter((s) => s !== specialty));
   };
 
-  const updateSchedule = (day, field, value) => {
+  const updateSchedule = (day: string, field: string, value: string | boolean) => {
     setSchedule((prev) => ({
       ...prev,
       [day]: {
-        ...prev[day],
+        ...(prev as any)[day],
         [field]: value,
       },
     }));
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!formData.fullName.trim()) newErrors.fullName = "Nome é obrigatório";
     if (!formData.email.trim()) newErrors.email = "Email é obrigatório";

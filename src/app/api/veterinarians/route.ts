@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
+import { PasswordService } from '@/lib/password'
 import { z } from 'zod'
 
 const veterinarianCreateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
   role: z.enum(['VETERINARIAN', 'ASSISTANT']).default('VETERINARIAN'),
   active: z.boolean().default(true)
 })
@@ -107,6 +108,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validatedData = veterinarianCreateSchema.parse(body)
 
+    // Validar força da senha
+    const passwordValidation = PasswordService.validatePasswordStrength(validatedData.password)
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: 'Senha não atende aos critérios de segurança', details: passwordValidation.errors },
+        { status: 400 }
+      )
+    }
+
     // Verificar se já existe usuário com o mesmo email
     const existingUser = await prisma.user.findUnique({
       where: {
@@ -121,11 +131,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Hash da senha
+    const hashedPassword = await PasswordService.hashPassword(validatedData.password)
+
     const veterinarian = await prisma.user.create({
       data: {
         name: validatedData.name,
         email: validatedData.email,
-        password: validatedData.password, // In production, this should be hashed
+        password: hashedPassword,
         role: validatedData.role,
         active: validatedData.active,
         clinicId: user.clinicId

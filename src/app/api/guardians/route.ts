@@ -26,11 +26,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where = {
-      pets: {
-        some: {
-          clinicId: user.clinicId
-        }
-      },
+      clinicId: user.clinicId,
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
@@ -129,6 +125,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: validatedData.name,
         email: validatedData.email,
+        clinicId: user.clinicId,
         ...(validatedData.phone && { phone: validatedData.phone }),
         ...(validatedData.address && { address: validatedData.address })
       },

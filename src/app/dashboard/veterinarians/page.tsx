@@ -221,10 +221,8 @@ export default function VeterinariansListPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
-  // Extract unique specialties for filter
-  const allSpecialties = Array.from(
-    new Set(veterinarians.map(vet => vet.specialty).filter(Boolean))
-  );
+  // Extract unique specialties for filter - temporarily empty since specialty is not implemented
+  const allSpecialties: string[] = [];
 
   const loadVeterinarians = useCallback(async (page = 1, search = "", specialty = "all", status = "all") => {
     try {
@@ -270,7 +268,7 @@ export default function VeterinariansListPage() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [searchTerm, specialtyFilter, statusFilter, searchDebounce, loadVeterinarians]);
+  }, [searchTerm, specialtyFilter, statusFilter, loadVeterinarians]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);

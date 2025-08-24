@@ -88,11 +88,16 @@ export async function GET(
         avatarUrl: pet.avatarUrl,
         guardian_id: pet.guardianId,
         clinic_id: pet.clinicId,
-        guardian: pet.guardian,
+        guardian: pet.guardian ? {
+          guardian_id: pet.guardian.id,
+          fullName: pet.guardian.name,
+          email: pet.guardian.email,
+          phone: pet.guardian.phone
+        } : undefined,
         consultations: pet.consultations,
         appointments: pet.appointments,
-        createdAt: pet.createdAt,
-        updatedAt: pet.updatedAt
+        created_at: pet.createdAt,
+        updated_at: pet.updatedAt
       }
     })
 
@@ -190,9 +195,14 @@ export async function PUT(
         avatarUrl: updatedPet.avatarUrl,
         guardian_id: updatedPet.guardianId,
         clinic_id: updatedPet.clinicId,
-        guardian: updatedPet.guardian,
-        createdAt: updatedPet.createdAt,
-        updatedAt: updatedPet.updatedAt
+        guardian: updatedPet.guardian ? {
+          guardian_id: updatedPet.guardian.id,
+          fullName: updatedPet.guardian.name,
+          email: updatedPet.guardian.email,
+          phone: updatedPet.guardian.phone
+        } : undefined,
+        created_at: updatedPet.createdAt,
+        updated_at: updatedPet.updatedAt
       }
     })
 

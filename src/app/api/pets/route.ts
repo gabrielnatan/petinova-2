@@ -80,9 +80,14 @@ export async function GET(request: NextRequest) {
         avatarUrl: pet.avatarUrl,
         guardian_id: pet.guardianId,
         clinic_id: pet.clinicId,
-        guardian: pet.guardian,
-        createdAt: pet.createdAt,
-        updatedAt: pet.updatedAt
+        guardian: pet.guardian ? {
+          guardian_id: pet.guardian.id,
+          fullName: pet.guardian.name,
+          email: pet.guardian.email,
+          phone: pet.guardian.phone
+        } : undefined,
+        created_at: pet.createdAt,
+        updated_at: pet.updatedAt
       })),
       pagination: {
         page,
@@ -169,9 +174,14 @@ export async function POST(request: NextRequest) {
         avatarUrl: pet.avatarUrl,
         guardian_id: pet.guardianId,
         clinic_id: pet.clinicId,
-        guardian: pet.guardian,
-        createdAt: pet.createdAt,
-        updatedAt: pet.updatedAt
+        guardian: pet.guardian ? {
+          guardian_id: pet.guardian.id,
+          fullName: pet.guardian.name,
+          email: pet.guardian.email,
+          phone: pet.guardian.phone
+        } : undefined,
+        created_at: pet.createdAt,
+        updated_at: pet.updatedAt
       }
     }, { status: 201 })
 

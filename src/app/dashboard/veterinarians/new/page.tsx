@@ -74,19 +74,9 @@ export default function NewVeterinarianPage() {
       const veterinarianData: CreateVeterinarianData = {
         name: data.name,
         email: data.email,
-        phone: data.phone,
-        crmv: {
-          number: data.crmvNumber,
-          state: data.crmvState.toUpperCase(),
-          issueDate: data.crmvIssueDate,
-          expirationDate: data.crmvExpirationDate
-        },
-        specialty: data.specialty || undefined,
-        yearsOfExperience: data.yearsOfExperience || undefined,
-        availabilitySchedule: selectedDays.length > 0 ? selectedDays : undefined,
-        avatarUrl: data.avatarUrl || undefined,
-        notes: data.notes || undefined,
-        isActive: true
+        password: 'tempPassword123!',
+        role: 'VETERINARIAN',
+        active: true
       };
       
       await veterinarianAPI.createVeterinarian(veterinarianData);

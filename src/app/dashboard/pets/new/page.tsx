@@ -2,20 +2,16 @@
 
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
-// import { undefined as any, type any } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface Guardian {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-}
+import { petSchema, type PetFormData } from "@/lib/validations/pet";
+import { petAPI } from "@/lib/api/pets";
+import { guardianAPI, type Guardian } from "@/lib/api/guardians";
 
 export default function NewPetPage() {
   const router = useRouter();
@@ -27,32 +23,21 @@ export default function NewPetPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<any>({
-    // resolver: zodResolver(undefined as any),
+  } = useForm<PetFormData>({
+    resolver: zodResolver(petSchema),
     defaultValues: {
       isNeutered: false,
-      proceduresPerformed: [],
-      preexistingConditions: [],
-      restrictions: [],
     },
   });
 
   useEffect(() => {
     const fetchGuardians = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        const response = await fetch("/api/guardians", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setGuardians(data.guardians);
-        }
+        const response = await guardianAPI.getGuardians({ limit: 100 });
+        setGuardians(response.guardians);
       } catch (error) {
         console.error("Error fetching guardians:", error);
+        setSubmitError("Erro ao carregar tutores");
       } finally {
         setLoadingGuardians(false);
       }
@@ -61,34 +46,21 @@ export default function NewPetPage() {
     fetchGuardians();
   }, []);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: PetFormData) => {
     setSubmitError(null);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch("/api/pets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: data.name,
-          species: data.species,
-          breed: data.breed,
-          size: data.size,
-          weight: data.weight,
-          isNeutered: data.isNeutered,
-          environment: data.environment,
-          birthDate: data.birthDate?.toISOString(),
-          notes: data.notes,
-          guardianId: data.guardian_id,
-        }),
+      await petAPI.createPet({
+        name: data.name,
+        species: data.species,
+        breed: data.breed || undefined,
+        size: data.size || undefined,
+        weight: data.weight || undefined,
+        isNeutered: data.isNeutered,
+        environment: data.environment || undefined,
+        birthDate: data.birthDate || undefined,
+        notes: data.notes || undefined,
+        guardian_id: data.guardian_id,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao criar pet");
-      }
 
       router.push("/dashboard/pets");
     } catch (error) {
@@ -126,7 +98,7 @@ export default function NewPetPage() {
               <Input
                 label="Nome do Pet"
                 {...register("name")}
-                error={undefined}
+                error={errors.name?.message}
                 placeholder="Ex: Buddy"
               />
 
@@ -148,7 +120,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.species && (
                   <p className="text-sm text-error mt-1">
-                    {/* errors.species.message */`Error in species`}
+                    {errors.species.message}
                   </p>
                 )}
               </div>
@@ -158,7 +130,7 @@ export default function NewPetPage() {
               <Input
                 label="Raça"
                 {...register("breed")}
-                error={undefined}
+                error={errors.breed?.message}
                 placeholder="Ex: Golden Retriever"
               />
 
@@ -177,7 +149,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.size && (
                   <p className="text-sm text-error mt-1">
-                    {/* errors.size.message */`Error in size`}
+                    {errors.size.message}
                   </p>
                 )}
               </div>
@@ -189,15 +161,15 @@ export default function NewPetPage() {
                 type="number"
                 step="0.1"
                 {...register("weight", { valueAsNumber: true })}
-                error={undefined}
+                error={errors.weight?.message}
                 placeholder="Ex: 15.5"
               />
 
               <Input
                 label="Data de Nascimento"
                 type="date"
-                {...register("birthDate", { valueAsDate: true })}
-                error={undefined}
+                {...register("birthDate")}
+                error={errors.birthDate?.message}
               />
 
               <div>
@@ -216,7 +188,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.environment && (
                   <p className="text-sm text-error mt-1">
-                    {/* errors.environment.message */`Error in environment`}
+                    {errors.environment.message}
                   </p>
                 )}
               </div>
@@ -243,21 +215,6 @@ export default function NewPetPage() {
             </h2>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Tipo de Pelagem"
-                {...register("coatType")}
-                error={undefined}
-                placeholder="Ex: Longo, Curto, Crespo"
-              />
-
-              <Input
-                label="Cor"
-                {...register("color")}
-                error={undefined}
-                placeholder="Ex: Dourado, Preto, Malhado"
-              />
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
@@ -284,14 +241,14 @@ export default function NewPetPage() {
                   {loadingGuardians ? "Carregando..." : "Selecione o tutor"}
                 </option>
                 {guardians.map((guardian) => (
-                  <option key={guardian.id} value={guardian.id}>
-                    {guardian.name} - {guardian.phone || guardian.email}
+                  <option key={guardian.guardian_id} value={guardian.guardian_id}>
+                    {guardian.fullName} - {guardian.phone || guardian.email}
                   </option>
                 ))}
               </select>
               {errors.guardian_id && (
                 <p className="text-sm text-error mt-1">
-                  {/* errors.guardian_id.message */`Error in guardian_id`}
+                  {errors.guardian_id.message}
                 </p>
               )}
               {guardians.length === 0 && !loadingGuardians && (

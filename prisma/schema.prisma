@@ -26,8 +26,9 @@ model Clinic {
   updatedAt  DateTime @updatedAt
   
   // Relacionamentos
-  users User[]
-  pets  Pet[]
+  users     User[]
+  pets      Pet[]
+  guardians Guardian[]
   
   @@map("clinics")
 }
@@ -36,7 +37,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   password  String
-  name      String
+  name      String   @map("fullName")
   role      UserRole @default(VETERINARIAN)
   active    Boolean  @default(true)
   clinicId  String
@@ -81,14 +82,16 @@ model Pet {
 
 model Guardian {
   id        String   @id @default(cuid())
-  name      String
+  name      String   @map("fullName")
   email     String   @unique
   phone     String?
   address   String?
+  clinicId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   // Relacionamentos
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   pets         Pet[]
   appointments Appointment[]
   

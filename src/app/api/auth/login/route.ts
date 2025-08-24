@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { PasswordService } from '@/lib/password'
 import { z } from 'zod'
 import { generateAccessToken, createRefreshToken } from '@/lib/jwt'
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const passwordMatch = await bcrypt.compare(validatedData.password, user.password)
+    const passwordMatch = await PasswordService.comparePassword(validatedData.password, user.password)
     
     if (!passwordMatch) {
       return NextResponse.json(
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         message: 'Login realizado com sucesso',
         user: {
           user_id: user.id,
-          name: user.name,
+          fullName: user.name,
           email: user.email,
           role: user.role.toLowerCase(),
           active: user.active,
