@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCPF, formatPhone } from "@/lib/utils";
+import { formatPhone } from "@/lib/utils";
 import { guardianAPI, type Guardian } from "@/lib/api/guardians";
 import Link from "next/link";
 
@@ -55,7 +55,7 @@ function GuardianCard({
 
   const formatAddress = (address: Guardian['address']) => {
     if (!address) return 'Endereço não informado';
-    return `${address.street}, ${address.number}${address.complement ? ` - ${address.complement}` : ''} - ${address.neighborhood}, ${address.city} - ${address.state}`;
+    return address;
   };
 
   return (
@@ -76,11 +76,11 @@ function GuardianCard({
                 <h3 className="text-lg font-semibold text-text-primary">
                   {guardian.fullName}
                 </h3>
-                {guardian.cpf && (
+                {/* {guardian.cpf && (
                   <p className="text-sm text-text-secondary">
                     CPF: {formatCPF(guardian.cpf)}
                   </p>
-                )}
+                )} */}
               </div>
             </div>
 
@@ -139,7 +139,7 @@ function GuardianCard({
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Phone className="w-4 h-4 mr-2" />
-              {formatPhone(guardian.phone)}
+              {guardian.phone ? formatPhone(guardian.phone) : 'Não informado'}
             </div>
             {guardian.address && (
               <div className="flex items-start text-sm text-text-secondary">
@@ -217,7 +217,7 @@ export default function GuardiansListPage() {
 
   useEffect(() => {
     loadGuardians(1);
-  }, [loadGuardians]);
+  }, []);
 
   useEffect(() => {
     if (searchDebounce) {
@@ -295,7 +295,7 @@ export default function GuardiansListPage() {
 
         <div className="flex items-center border border-border rounded-md">
           <Button
-            variant={viewMode === "cards" ? "default" : "ghost"}
+            variant={viewMode === "cards" ? "primary" : "ghost"}
             size="sm"
             onClick={() => setViewMode("cards")}
             className="rounded-r-none border-r"
@@ -303,7 +303,7 @@ export default function GuardiansListPage() {
             <Grid3X3 className="w-4 h-4" />
           </Button>
           <Button
-            variant={viewMode === "table" ? "default" : "ghost"}
+            variant={viewMode === "table" ? "primary" : "ghost"}
             size="sm"
             onClick={() => setViewMode("table")}
             className="rounded-l-none"
@@ -406,7 +406,7 @@ export default function GuardiansListPage() {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage <= 1 || loading}
@@ -422,7 +422,7 @@ export default function GuardiansListPage() {
                       return (
                         <Button
                           key={page}
-                          variant={currentPage === page ? "default" : "outline"}
+                          variant={currentPage === page ? "primary" : "secondary"}
                           size="sm"
                           onClick={() => handlePageChange(page)}
                           disabled={loading}
@@ -433,7 +433,7 @@ export default function GuardiansListPage() {
                     })}
                     
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage >= pagination.pages || loading}
@@ -484,7 +484,7 @@ export default function GuardiansListPage() {
                         {guardian.fullName}
                       </TableCell>
                       <TableCell>{guardian.email}</TableCell>
-                      <TableCell>{formatPhone(guardian.phone)}</TableCell>
+                      <TableCell>{guardian.phone ? formatPhone(guardian.phone) : 'Não informado'}</TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-1">
                           <Heart className="w-4 h-4 text-primary-500" />

@@ -719,7 +719,7 @@ export default function StockMovementsPage() {
                 Cancelar
               </Button>
               <Button
-                variant="danger"
+                variant="error"
                 onClick={handleDeleteMovement}
               >
                 <Trash2 className="w-4 h-4 mr-2" />

@@ -355,7 +355,7 @@ export default function NewAppointmentPage() {
                   </div>
                   <div>
                     <h3 className="font-medium text-text-primary">
-                      {selectedGuardian.name}
+                      {selectedGuardian.fullName}
                     </h3>
                     <p className="text-sm text-text-secondary">Tutor</p>
                   </div>
@@ -485,7 +485,7 @@ export default function NewAppointmentPage() {
   );
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6  mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>

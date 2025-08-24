@@ -72,7 +72,7 @@ export default function Dashboard() {
     _layout: Layout[],
     allLayouts: { [key: string]: Layout[] },
   ) => {
-    setLayouts(allLayouts);
+    setLayouts(allLayouts as any);
     if (!editMode) return;
 
     allLayouts.lg.forEach((item) => {

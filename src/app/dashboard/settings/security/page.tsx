@@ -83,7 +83,7 @@ const mockUser = {
   ],
 };
 
-const formatDateTime = (date) => {
+const formatDateTime = (date: Date) => {
   return date.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -93,7 +93,7 @@ const formatDateTime = (date) => {
   });
 };
 
-const getTimeAgo = (date) => {
+const getTimeAgo = (date: Date) => {
   const now = new Date();
   const diff = now.getTime() - date.getTime();
   const minutes = Math.floor(diff / (1000 * 60));
@@ -105,14 +105,14 @@ const getTimeAgo = (date) => {
   return `${days} dias atrás`;
 };
 
-const getDeviceIcon = (device) => {
+const getDeviceIcon = (device: string) => {
   if (device.includes("iPhone") || device.includes("Android"))
     return Smartphone;
   if (device.includes("Mac")) return Monitor;
   return Globe;
 };
 
-const getEventIcon = (type) => {
+const getEventIcon = (type: string) => {
   switch (type) {
     case "login_success":
       return CheckCircle;
@@ -125,7 +125,7 @@ const getEventIcon = (type) => {
   }
 };
 
-const getEventColor = (type) => {
+const getEventColor = (type: string) => {
   switch (type) {
     case "login_success":
       return "text-success";
@@ -144,7 +144,7 @@ export default function SecuritySettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
-  const [sessionToTerminate, setSessionToTerminate] = useState(null);
+  const [sessionToTerminate, setSessionToTerminate] = useState<any>(null);
 
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
@@ -152,18 +152,22 @@ export default function SecuritySettingsPage() {
     confirmPassword: "",
   });
 
-  const [errors, setErrors] = useState({});
+  const [userSecurity] = useState({
+    twoFactorEnabled: mockUser.twoFactorEnabled,
+  });
+
+  const [errors, setErrors] = useState({} as any);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handlePasswordChange = (field, value) => {
+  const handlePasswordChange = (field: string, value: string) => {
     setPasswordForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setErrors((prev: any) => ({ ...prev, [field]: "" }));
     }
   };
 
   const validatePasswordForm = () => {
-    const newErrors = {};
+    const newErrors = {} as any;
 
     if (!passwordForm.currentPassword) {
       newErrors.currentPassword = "Senha atual é obrigatória";
@@ -206,7 +210,7 @@ export default function SecuritySettingsPage() {
     }
   };
 
-  const handleTerminateSession = async (sessionId) => {
+  const handleTerminateSession = async (sessionId: string) => {
     try {
       console.log("Terminating session:", sessionId);
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -482,7 +486,7 @@ export default function SecuritySettingsPage() {
                   </div>
                 </div>
                 <Button
-                  variant={userSecurity.twoFactorEnabled ? "danger" : "primary"}
+                  variant={userSecurity.twoFactorEnabled ? "error" : "primary"}
                   onClick={handle2FAToggle}
                 >
                   {userSecurity.twoFactorEnabled ? "Desabilitar" : "Habilitar"}
@@ -619,7 +623,7 @@ export default function SecuritySettingsPage() {
                     </div>
                     {!session.current && (
                       <Button
-                        variant="danger"
+                        variant="error"
                         size="sm"
                         onClick={() => {
                           setSessionToTerminate(session);
@@ -736,7 +740,7 @@ export default function SecuritySettingsPage() {
                 Cancelar
               </Button>
               <Button
-                variant="danger"
+                variant="error"
                 onClick={() => handleTerminateSession(sessionToTerminate.id)}
               >
                 <X className="w-4 h-4 mr-2" />

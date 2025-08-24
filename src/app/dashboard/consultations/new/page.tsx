@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Save,
   FileText,
-  DollarSign,
   Calendar,
   Heart,
   User,
@@ -18,7 +17,7 @@ import {
   type ConsultationFormData,
 } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
 // import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
@@ -26,11 +25,21 @@ import Link from "next/link";
 // import { useAuth } from "@/store";
 // import { useRouter } from "next/navigation";
 
-const paymentMethods = [
-  { value: "cash", label: "Dinheiro" },
-  { value: "card", label: "Cartão" },
-  { value: "pix", label: "PIX" },
-  { value: "transfer", label: "Transferência" },
+
+
+const mockAppointments = [
+  {
+    id: "1",
+    pet: { name: "Buddy" },
+    guardian: { fullName: "João Silva" },
+    dateTime: new Date(),
+  },
+  {
+    id: "2", 
+    pet: { name: "Luna" },
+    guardian: { fullName: "Maria Santos" },
+    dateTime: new Date(),
+  },
 ];
 
 export default function NewConsultationPage() {
@@ -41,17 +50,13 @@ export default function NewConsultationPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-    watch,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setValue,
   } = useForm<ConsultationFormData>({
     resolver: zodResolver(consultationSchema),
-    defaultValues: {
-      paid: false,
-      payment_plan: 1,
-    },
+    defaultValues: {},
   });
 
-  const paymentPlan = watch("payment_plan");
 
   const onSubmit = async (data: ConsultationFormData) => {
     try {
@@ -69,11 +74,11 @@ export default function NewConsultationPage() {
   const handleAppointmentSelect = (appointmentId: string) => {
     const appointment = mockAppointments.find((a) => a.id === appointmentId);
     setSelectedAppointment(appointment);
-    setValue("appointment_id", appointmentId);
+    // setValue("appointment_id", appointmentId);
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6  mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>
@@ -127,11 +132,11 @@ export default function NewConsultationPage() {
                         </option>
                       ))}
                     </select>
-                    {errors.appointment_id && (
+                    {/* {errors.appointment_id && (
                       <p className="text-sm text-error mt-1">
                         {errors.appointment_id.message}
                       </p>
-                    )}
+                    )} */}
                   </div>
 
                   {selectedAppointment && (
@@ -182,14 +187,14 @@ export default function NewConsultationPage() {
                     Descrição da Consulta
                   </label>
                   <textarea
-                    {...register("description")}
+                    {...register("notes")}
                     className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
                     rows={4}
                     placeholder="Descreva os procedimentos realizados, diagnóstico, observações..."
                   />
-                  {errors.description && (
+                  {errors.notes && (
                     <p className="text-sm text-error mt-1">
-                      {errors.description.message}
+                      {errors.notes.message}
                     </p>
                   )}
                 </div>
@@ -209,9 +214,9 @@ export default function NewConsultationPage() {
             </Card>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Payment Information */}
+          {/* Right Column - Commented out due to schema mismatch */}
+          {/* <div className="space-y-6">
+            Payment Information
             <Card>
               <CardHeader>
                 <h2 className="text-xl font-semibold text-text-primary flex items-center">
@@ -220,100 +225,10 @@ export default function NewConsultationPage() {
                 </h2>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Input
-                  label="Valor da Consulta"
-                  type="number"
-                  step="0.01"
-                  {...register("amount", { valueAsNumber: true })}
-                  error={errors.amount?.message}
-                  placeholder="150.00"
-                  icon={DollarSign}
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    Forma de Pagamento
-                  </label>
-                  <select
-                    {...register("payment_method")}
-                    className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-                  >
-                    <option value="">Selecione a forma de pagamento</option>
-                    {paymentMethods.map((method) => (
-                      <option key={method.value} value={method.value}>
-                        {method.label}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.payment_method && (
-                    <p className="text-sm text-error mt-1">
-                      {errors.payment_method.message}
-                    </p>
-                  )}
-                </div>
-
-                <Input
-                  label="Número de Parcelas"
-                  type="number"
-                  min="1"
-                  max="12"
-                  {...register("payment_plan", { valueAsNumber: true })}
-                  error={errors.payment_plan?.message}
-                  placeholder="1"
-                />
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    {...register("paid")}
-                    className="h-4 w-4 text-primary-600 border-border rounded focus:ring-primary-500"
-                  />
-                  <label className="text-sm text-text-primary">
-                    Pagamento realizado
-                  </label>
-                </div>
+                Payment form fields removed due to schema mismatch
               </CardContent>
             </Card>
-
-            {/* Summary */}
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-text-primary">
-                  Resumo
-                </h3>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-secondary">Valor total:</span>
-                  <span className="text-text-primary font-medium">
-                    {watch("amount")
-                      ? `R$ ${Number(watch("amount")).toFixed(2)}`
-                      : "R$ 0,00"}
-                  </span>
-                </div>
-                {paymentPlan && paymentPlan > 1 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">
-                      Valor por parcela:
-                    </span>
-                    <span className="text-text-primary font-medium">
-                      {watch("amount")
-                        ? `R$ ${(Number(watch("amount")) / paymentPlan).toFixed(2)}`
-                        : "R$ 0,00"}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-secondary">Status:</span>
-                  <span
-                    className={`font-medium ${watch("paid") ? "text-success" : "text-warning"}`}
-                  >
-                    {watch("paid") ? "Pago" : "Pendente"}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          </div> */}
         </div>
 
         {/* Actions */}

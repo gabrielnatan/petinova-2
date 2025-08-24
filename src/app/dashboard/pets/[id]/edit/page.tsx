@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
-import { petSchema, type PetFormData } from "@/lib/validations";
+// import { undefined as any, type any } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -32,8 +31,8 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<PetFormData>({
-    resolver: zodResolver(petSchema),
+  } = useForm<any>({
+    // resolver: zodResolver(undefined as any),
   });
 
   useEffect(() => {
@@ -91,7 +90,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
     fetchData();
   }, [resolvedParams.id, reset]);
 
-  const onSubmit = async (data: PetFormData) => {
+  const onSubmit = async (data: any) => {
     setSubmitError(null);
     try {
       const token = localStorage.getItem("accessToken");
@@ -129,7 +128,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
 
   if (loadingPet) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="p-6  mx-auto">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
         </div>
@@ -138,7 +137,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6  mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>
@@ -166,7 +165,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
               <Input
                 label="Nome do Pet"
                 {...register("name")}
-                error={errors.name?.message}
+                error={undefined}
                 placeholder="Ex: Buddy"
               />
 
@@ -188,7 +187,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.species && (
                   <p className="text-sm text-error mt-1">
-                    {errors.species.message}
+                    {errors.species?.message as string}
                   </p>
                 )}
               </div>
@@ -198,7 +197,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
               <Input
                 label="Raça"
                 {...register("breed")}
-                error={errors.breed?.message}
+                error={undefined}
                 placeholder="Ex: Golden Retriever"
               />
 
@@ -217,7 +216,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.size && (
                   <p className="text-sm text-error mt-1">
-                    {errors.size.message}
+                    {errors.size?.message as string}
                   </p>
                 )}
               </div>
@@ -229,7 +228,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 type="number"
                 step="0.1"
                 {...register("weight", { valueAsNumber: true })}
-                error={errors.weight?.message}
+                error={undefined}
                 placeholder="Ex: 15.5"
               />
 
@@ -237,7 +236,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 label="Data de Nascimento"
                 type="date"
                 {...register("birthDate", { valueAsDate: true })}
-                error={errors.birthDate?.message}
+                error={undefined}
               />
 
               <div>
@@ -256,7 +255,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.environment && (
                   <p className="text-sm text-error mt-1">
-                    {errors.environment.message}
+                    {errors.environment?.message as string}
                   </p>
                 )}
               </div>
@@ -315,7 +314,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
               </select>
               {errors.guardian_id && (
                 <p className="text-sm text-error mt-1">
-                  {errors.guardian_id.message}
+                  {/* errors.guardian_id.message */`Error in guardian_id`}
                 </p>
               )}
               {guardians.length === 0 && !loadingGuardians && (

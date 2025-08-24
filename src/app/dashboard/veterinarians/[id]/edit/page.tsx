@@ -104,11 +104,11 @@ const brazilianStates = [
   "TO",
 ];
 
-const formatDate = (date) => {
+const formatDate = (date: any) => {
   return date.toISOString().split("T")[0];
 };
 
-const getDayName = (day) => {
+const getDayName = (day: any) => {
   const days = {
     Monday: "Segunda-feira",
     Tuesday: "Terça-feira",
@@ -118,10 +118,10 @@ const getDayName = (day) => {
     Saturday: "Sábado",
     Sunday: "Domingo",
   };
-  return days[day] || day;
+  return (days as any)[day] || day;
 };
 
-export default function EditVeterinarianPage({ params }) {
+export default function EditVeterinarianPage({ params }:{ params:any }) {
   const [formData, setFormData] = useState({
     fullName: mockVeterinarian.fullName,
     email: mockVeterinarian.email,

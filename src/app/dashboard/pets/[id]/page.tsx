@@ -209,7 +209,7 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
             </Link>
           </Button>
           <Button
-            variant="destructive"
+            variant="error"
             onClick={handleDelete}
             disabled={isDeleting}
           >

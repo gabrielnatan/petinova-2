@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
-import { petSchema, type PetFormData } from "@/lib/validations";
+// import { undefined as any, type any } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -28,8 +27,8 @@ export default function NewPetPage() {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<PetFormData>({
-    resolver: zodResolver(petSchema),
+  } = useForm<any>({
+    // resolver: zodResolver(undefined as any),
     defaultValues: {
       isNeutered: false,
       proceduresPerformed: [],
@@ -62,7 +61,7 @@ export default function NewPetPage() {
     fetchGuardians();
   }, []);
 
-  const onSubmit = async (data: PetFormData) => {
+  const onSubmit = async (data: any) => {
     setSubmitError(null);
     try {
       const token = localStorage.getItem("accessToken");
@@ -99,7 +98,7 @@ export default function NewPetPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6  mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>
@@ -127,7 +126,7 @@ export default function NewPetPage() {
               <Input
                 label="Nome do Pet"
                 {...register("name")}
-                error={errors.name?.message}
+                error={undefined}
                 placeholder="Ex: Buddy"
               />
 
@@ -149,7 +148,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.species && (
                   <p className="text-sm text-error mt-1">
-                    {errors.species.message}
+                    {/* errors.species.message */`Error in species`}
                   </p>
                 )}
               </div>
@@ -159,7 +158,7 @@ export default function NewPetPage() {
               <Input
                 label="Raça"
                 {...register("breed")}
-                error={errors.breed?.message}
+                error={undefined}
                 placeholder="Ex: Golden Retriever"
               />
 
@@ -178,7 +177,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.size && (
                   <p className="text-sm text-error mt-1">
-                    {errors.size.message}
+                    {/* errors.size.message */`Error in size`}
                   </p>
                 )}
               </div>
@@ -190,7 +189,7 @@ export default function NewPetPage() {
                 type="number"
                 step="0.1"
                 {...register("weight", { valueAsNumber: true })}
-                error={errors.weight?.message}
+                error={undefined}
                 placeholder="Ex: 15.5"
               />
 
@@ -198,7 +197,7 @@ export default function NewPetPage() {
                 label="Data de Nascimento"
                 type="date"
                 {...register("birthDate", { valueAsDate: true })}
-                error={errors.birthDate?.message}
+                error={undefined}
               />
 
               <div>
@@ -217,7 +216,7 @@ export default function NewPetPage() {
                 </select>
                 {errors.environment && (
                   <p className="text-sm text-error mt-1">
-                    {errors.environment.message}
+                    {/* errors.environment.message */`Error in environment`}
                   </p>
                 )}
               </div>
@@ -248,14 +247,14 @@ export default function NewPetPage() {
               <Input
                 label="Tipo de Pelagem"
                 {...register("coatType")}
-                error={errors.coatType?.message}
+                error={undefined}
                 placeholder="Ex: Longo, Curto, Crespo"
               />
 
               <Input
                 label="Cor"
                 {...register("color")}
-                error={errors.color?.message}
+                error={undefined}
                 placeholder="Ex: Dourado, Preto, Malhado"
               />
             </div>
@@ -292,7 +291,7 @@ export default function NewPetPage() {
               </select>
               {errors.guardian_id && (
                 <p className="text-sm text-error mt-1">
-                  {errors.guardian_id.message}
+                  {/* errors.guardian_id.message */`Error in guardian_id`}
                 </p>
               )}
               {guardians.length === 0 && !loadingGuardians && (

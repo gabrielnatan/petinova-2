@@ -262,9 +262,9 @@ class ProductAPI {
     return response.products;
   }
 
-  async toggleProductStatus(id: string, isActive: boolean): Promise<ProductResponse> {
-    return this.updateProduct(id, { isActive });
-  }
+  // async toggleProductStatus(id: string, isActive: boolean): Promise<ProductResponse> {
+  //   return this.updateProduct(id, { isActive });
+  // }
 
   // Métodos de relatório e análise
   async getInventoryReport(): Promise<{
@@ -323,7 +323,7 @@ class ProductAPI {
 
   // Utilitário para gerar código de barras
   generateBarcode(): string {
-    return Math.floor(Math.random() * 9000000000000) + 1000000000000;
+    return (Math.floor(Math.random() * 9000000000000) + 1000000000000).toString();
   }
 
   // Utilitário para gerar SKU

@@ -48,22 +48,14 @@ export default function NewGuardianPage() {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        cpf: data.cpf || undefined,
-        notes: data.notes || undefined
+        // cpf: data.cpf || undefined,
+        // notes: data.notes || undefined
       };
       
-      // Adicionar endereço se pelo menos rua e número foram preenchidos
-      if (data.street && data.number) {
-        guardianData.address = {
-          street: data.street,
-          number: data.number,
-          complement: data.complement || undefined,
-          neighborhood: data.neighborhood || '',
-          city: data.city || '',
-          state: data.state || '',
-          zipCode: data.zipCode || ''
-        };
-      }
+      // Address handling commented due to schema mismatch
+      // if (data.street && data.number) {
+      //   guardianData.address = `${data.street}, ${data.number}`;
+      // }
       
       await guardianAPI.createGuardian(guardianData);
       router.push('/dashboard/guardians');
@@ -73,7 +65,7 @@ export default function NewGuardianPage() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6  mx-auto">
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>

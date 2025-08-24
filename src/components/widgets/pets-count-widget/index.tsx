@@ -6,7 +6,7 @@ export function PetsCountWidget() {
   const { pets } = usePets();
   const activePets = pets.filter((pet) => !pet.deathDate);
   const newPetsThisMonth = pets.filter((pet) => {
-    const petDate = new Date(pet.created_at);
+    const petDate = new Date(pet.createdAt);
     const now = new Date();
     return (
       petDate.getMonth() === now.getMonth() &&

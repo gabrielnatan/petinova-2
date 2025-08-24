@@ -50,17 +50,22 @@ TableBody.displayName = "TableBody";
 export const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
->(({ className, ...props }, ref) => (
-  <motion.tr
-    ref={ref}
-    className={cn(
-      "hover:bg-background-secondary transition-colors duration-200",
-      className,
-    )}
-    whileHover={{ backgroundColor: "var(--color-background-secondary)" }}
-    {...props}
-  />
-));
+>(({ className, ...props }, ref) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
+  
+  return (
+    <motion.tr
+      ref={ref}
+      className={cn(
+        "hover:bg-background-secondary transition-colors duration-200",
+        className,
+      )}
+      whileHover={{ backgroundColor: "var(--color-background-secondary)" }}
+      {...restProps}
+    />
+  );
+});
 TableRow.displayName = "TableRow";
 
 export const TableHead = React.forwardRef<

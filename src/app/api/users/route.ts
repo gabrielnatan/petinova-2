@@ -8,28 +8,8 @@ const userCreateSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
-  phone: z.string().optional(),
-  role: z.enum(['ADMIN', 'VETERINARIAN', 'RECEPTIONIST']),
-  avatar: z.string().optional(),
-  permissions: z.object({
-    canManagePets: z.boolean().default(true),
-    canManageGuardians: z.boolean().default(true),
-    canManageAppointments: z.boolean().default(true),
-    canManageConsultations: z.boolean().default(false),
-    canManageInventory: z.boolean().default(false),
-    canManageUsers: z.boolean().default(false),
-    canViewReports: z.boolean().default(false),
-    canManageSettings: z.boolean().default(false)
-  }).optional(),
-  preferences: z.object({
-    theme: z.enum(['light', 'dark', 'system']).default('system'),
-    language: z.enum(['pt', 'en', 'es']).default('pt'),
-    timezone: z.string().default('America/Sao_Paulo'),
-    dateFormat: z.enum(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD']).default('DD/MM/YYYY'),
-    timeFormat: z.enum(['12h', '24h']).default('24h'),
-    currency: z.string().default('BRL')
-  }).optional(),
-  isActive: z.boolean().default(true)
+  role: z.enum(['ADMIN', 'VETERINARIAN', 'ASSISTANT']),
+  active: z.boolean().default(true)
 })
 
 // GET /api/users - Listar usuários
@@ -43,10 +23,10 @@ export async function GET(request: NextRequest) {
     // Verificar se tem permissão para gerenciar usuários
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { role: true, permissions: true }
+      select: { role: true }
     })
 
-    if (!currentUser || (currentUser.role !== 'ADMIN' && !(currentUser.permissions as any)?.canManageUsers)) {
+    if (!currentUser || currentUser.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Sem permissão para gerenciar usuários' }, { status: 403 })
     }
 
@@ -68,7 +48,7 @@ export async function GET(request: NextRequest) {
         ]
       }),
       ...(role && { role }),
-      ...(isActive !== null && { isActive: isActive === 'true' })
+      ...(isActive !== null && { active: isActive === 'true' })
     }
 
     const [users, total] = await Promise.all([
@@ -78,13 +58,8 @@ export async function GET(request: NextRequest) {
           id: true,
           name: true,
           email: true,
-          phone: true,
           role: true,
-          avatar: true,
-          permissions: true,
-          preferences: true,
-          isActive: true,
-          lastLoginAt: true,
+          active: true,
           createdAt: true,
           updatedAt: true
         },
@@ -100,13 +75,8 @@ export async function GET(request: NextRequest) {
         user_id: user.id,
         name: user.name,
         email: user.email,
-        phone: user.phone,
         role: user.role,
-        avatar: user.avatar,
-        permissions: user.permissions,
-        preferences: user.preferences,
-        isActive: user.isActive,
-        lastLoginAt: user.lastLoginAt,
+        active: user.active,
         created_at: user.createdAt,
         updated_at: user.updatedAt
       })),
@@ -138,10 +108,10 @@ export async function POST(request: NextRequest) {
     // Verificar se tem permissão para gerenciar usuários
     const currentUser = await prisma.user.findUnique({
       where: { id: user.userId },
-      select: { role: true, permissions: true }
+      select: { role: true }
     })
 
-    if (!currentUser || (currentUser.role !== 'ADMIN' && !(currentUser.permissions as any)?.canManageUsers)) {
+    if (!currentUser || currentUser.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Sem permissão para gerenciar usuários' }, { status: 403 })
     }
 
@@ -165,44 +135,22 @@ export async function POST(request: NextRequest) {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(validatedData.password, 12)
 
-    // Gerar permissões padrão baseadas no role se não fornecidas
-    const defaultPermissions = generateDefaultPermissions(validatedData.role)
-    const permissions = validatedData.permissions || defaultPermissions
-
-    // Gerar preferências padrão se não fornecidas
-    const defaultPreferences = {
-      theme: 'system' as const,
-      language: 'pt' as const,
-      timezone: 'America/Sao_Paulo',
-      dateFormat: 'DD/MM/YYYY' as const,
-      timeFormat: '24h' as const,
-      currency: 'BRL'
-    }
-    const preferences = validatedData.preferences || defaultPreferences
 
     const newUser = await prisma.user.create({
       data: {
         name: validatedData.name,
         email: validatedData.email,
         password: hashedPassword,
-        phone: validatedData.phone,
         role: validatedData.role,
-        avatar: validatedData.avatar,
-        permissions,
-        preferences,
-        isActive: validatedData.isActive,
+        active: validatedData.active,
         clinicId: user.clinicId
       },
       select: {
         id: true,
         name: true,
         email: true,
-        phone: true,
         role: true,
-        avatar: true,
-        permissions: true,
-        preferences: true,
-        isActive: true,
+        active: true,
         createdAt: true,
         updatedAt: true
       }
@@ -214,12 +162,8 @@ export async function POST(request: NextRequest) {
         user_id: newUser.id,
         name: newUser.name,
         email: newUser.email,
-        phone: newUser.phone,
         role: newUser.role,
-        avatar: newUser.avatar,
-        permissions: newUser.permissions,
-        preferences: newUser.preferences,
-        isActive: newUser.isActive,
+        active: newUser.active,
         created_at: newUser.createdAt,
         updated_at: newUser.updatedAt
       }
@@ -241,40 +185,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateDefaultPermissions(role: 'ADMIN' | 'VETERINARIAN' | 'RECEPTIONIST') {
-  const basePermissions = {
-    canManagePets: true,
-    canManageGuardians: true,
-    canManageAppointments: true,
-    canManageConsultations: false,
-    canManageInventory: false,
-    canManageUsers: false,
-    canViewReports: false,
-    canManageSettings: false
-  }
-
-  switch (role) {
-    case 'ADMIN':
-      return {
-        canManagePets: true,
-        canManageGuardians: true,
-        canManageAppointments: true,
-        canManageConsultations: true,
-        canManageInventory: true,
-        canManageUsers: true,
-        canViewReports: true,
-        canManageSettings: true
-      }
-    case 'VETERINARIAN':
-      return {
-        ...basePermissions,
-        canManageConsultations: true,
-        canManageInventory: true,
-        canViewReports: true
-      }
-    case 'RECEPTIONIST':
-      return basePermissions
-    default:
-      return basePermissions
-  }
-}

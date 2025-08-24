@@ -58,6 +58,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
+    
     return (
       <motion.button
         className={cn(buttonVariants({ variant, size, className }))}
@@ -65,7 +68,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         whileHover={{ scale: disabled || loading ? 1 : 1.02 }}
         whileTap={{ scale: disabled || loading ? 1 : 0.98 }}
-        {...props}
+        {...restProps}
       >
         {loading ? (
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />

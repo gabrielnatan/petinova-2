@@ -26,6 +26,11 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where = {
+      pets: {
+        some: {
+          clinicId: user.clinicId
+        }
+      },
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },

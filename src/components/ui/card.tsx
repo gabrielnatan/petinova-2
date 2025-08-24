@@ -11,6 +11,8 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, hover = false, ...props }, ref) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
     const Component = hover ? motion.div : "div";
     const motionProps = hover
       ? {
@@ -29,7 +31,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
           className,
         )}
         {...motionProps}
-        {...props}
+        {...restProps}
       >
         {children}
       </Component>

@@ -14,7 +14,6 @@ import {
   Clock,
   MoreVertical,
   Edit,
-  Receipt,
   Eye,
   Trash2,
   AlertCircle,
@@ -72,17 +71,17 @@ function ConsultationCard({
             <div className="flex items-center space-x-2">
               <div className="text-right">
                 <div className="flex items-center space-x-1 justify-end mb-1">
-                  {consultation.status === 'COMPLETED' ? (
+                  {consultation.diagnosis ? (
                     <CheckCircle className="w-4 h-4 text-success" />
                   ) : (
                     <Clock className="w-4 h-4 text-warning" />
                   )}
                   <span className={`text-xs ${
-                    consultation.status === 'COMPLETED' 
+                    consultation.diagnosis 
                       ? 'text-success' 
                       : 'text-warning'
                   }`}>
-                    {consultation.status === 'COMPLETED' ? 'Concluída' : 'Em Andamento'}
+                    {consultation.diagnosis ? 'Concluída' : 'Em Andamento'}
                   </span>
                 </div>
               </div>
@@ -118,12 +117,12 @@ function ConsultationCard({
                       <Edit className="w-4 h-4 mr-2" />
                       Editar
                     </Link>
-                    {consultation.prescription && (
+                    {/* {consultation.prescription && (
                       <button className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary">
                         <Receipt className="w-4 h-4 mr-2" />
                         Ver Prescrição
                       </button>
-                    )}
+                    )} */}
                     <button 
                       onClick={() => {
                         if (window.confirm('Tem certeza que deseja excluir esta consulta?')) {
@@ -152,7 +151,7 @@ function ConsultationCard({
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Stethoscope className="w-4 h-4 mr-2" />
-              {consultation.veterinarian.name} - {consultation.veterinarian.specialty}
+              {consultation.veterinarian.name} - {consultation.veterinarian.role}
             </div>
           </div>
 
@@ -169,28 +168,28 @@ function ConsultationCard({
 
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
-              {consultation.vitalSigns.weight && (
+              {/* {consultation.vitalSigns.weight && (
                 <span className="text-text-secondary">
                   {consultation.vitalSigns.weight}kg
                 </span>
-              )}
-              {consultation.symptoms && consultation.symptoms.length > 0 && (
+              )} */}
+              {/* {consultation.symptoms && consultation.symptoms.length > 0 && (
                 <span className="text-text-secondary">
                   {consultation.symptoms.length} sintomas
                 </span>
-              )}
+              )} */}
             </div>
             <div className="flex items-center space-x-2">
-              {consultation.prescription && (
+              {/* {consultation.prescription && (
                 <span className="text-primary-600 text-xs bg-primary-100 px-2 py-1 rounded">
                   Com prescrição
                 </span>
-              )}
-              {consultation.followUpDate && (
+              )} */}
+              {/* {consultation.followUpDate && (
                 <span className="text-warning text-xs bg-warning/10 px-2 py-1 rounded">
                   Retorno
                 </span>
-              )}
+              )} */}
             </div>
           </div>
         </CardContent>
@@ -266,8 +265,8 @@ export default function ConsultationsListPage() {
   };
 
   const totalConsultations = pagination.total;
-  const completedConsultations = consultations.filter(c => c.status === 'COMPLETED').length;
-  const inProgressConsultations = consultations.filter(c => c.status === 'IN_PROGRESS').length;
+  const completedConsultations = consultations.filter(c => c.diagnosis).length;
+  const inProgressConsultations = consultations.filter(c => !c.diagnosis).length;
   const thisMonthConsultations = consultations.filter(
     c => new Date(c.created_at).getMonth() === new Date().getMonth()
   ).length;
@@ -499,19 +498,19 @@ export default function ConsultationsListPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-1">
-                      {consultation.status === 'COMPLETED' ? (
+                      {consultation.diagnosis ? (
                         <CheckCircle className="w-4 h-4 text-success" />
                       ) : (
                         <Clock className="w-4 h-4 text-warning" />
                       )}
                       <span
                         className={`text-sm ${
-                          consultation.status === 'COMPLETED' 
+                          consultation.diagnosis 
                             ? 'text-success' 
                             : 'text-warning'
                         }`}
                       >
-                        {consultation.status === 'COMPLETED' ? 'Concluída' : 'Em Andamento'}
+                        {consultation.diagnosis ? 'Concluída' : 'Em Andamento'}
                       </span>
                     </div>
                   </TableCell>

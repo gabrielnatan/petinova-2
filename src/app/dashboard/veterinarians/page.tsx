@@ -80,7 +80,7 @@ function VeterinarianCard({
                   )}
                 </div>
                 <p className="text-sm text-text-secondary">
-                  CRMV {veterinarian.crmv.number}/{veterinarian.crmv.state}
+                  CRMV {veterinarian.veterinarian_id}
                 </p>
               </div>
             </div>
@@ -172,25 +172,14 @@ function VeterinarianCard({
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Phone className="w-4 h-4 mr-2" />
-              {veterinarian.phoneNumber}
+              {veterinarian.email}
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Award className="w-4 h-4 mr-2" />
-              {veterinarian.yearsOfExperience || 0} anos de experiência
+              {veterinarian.role}
             </div>
           </div>
 
-          {/* Specialties */}
-          {veterinarian.specialty && (
-            <div className="mb-4">
-              <p className="text-sm font-medium text-text-primary mb-2">
-                Especialidade:
-              </p>
-              <span className="px-2 py-1 bg-secondary-100 text-secondary-700 text-xs rounded-full">
-                {veterinarian.specialty}
-              </span>
-            </div>
-          )}
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -208,24 +197,6 @@ function VeterinarianCard({
             </div>
           </div>
 
-          {/* Availability */}
-          {veterinarian.availabilitySchedule && veterinarian.availabilitySchedule.length > 0 && (
-            <div className="border-t border-border pt-3">
-              <p className="text-sm font-medium text-text-primary mb-2">
-                Disponibilidade:
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {veterinarian.availabilitySchedule.map((day: string, index: number) => (
-                  <span
-                    key={index}
-                    className="px-2 py-1 bg-accent-100 text-accent-700 text-xs rounded"
-                  >
-                    {day}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </motion.div>
@@ -499,7 +470,7 @@ export default function VeterinariansListPage() {
               </div>
               <div className="flex items-center space-x-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage <= 1 || loading}
@@ -515,7 +486,7 @@ export default function VeterinariansListPage() {
                   return (
                     <Button
                       key={page}
-                      variant={currentPage === page ? "default" : "outline"}
+                      variant={currentPage === page ? "primary" : "secondary"}
                       size="sm"
                       onClick={() => handlePageChange(page)}
                       disabled={loading}
@@ -526,7 +497,7 @@ export default function VeterinariansListPage() {
                 })}
                 
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage >= pagination.pages || loading}
