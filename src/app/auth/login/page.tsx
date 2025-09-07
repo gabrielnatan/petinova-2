@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,20 +8,16 @@ import { useThemeStyles } from "@/components/theme-provider";
 import { useAuth } from "@/store";
 import { AuthRedirect } from "@/components/auth-redirect";
 import Link from "next/link";
-
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Senha deve ter pelo menos 6 caracteres"),
 });
-
 type LoginFormData = z.infer<typeof loginSchema>;
-
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const styles = useThemeStyles();
-
   const {
     register,
     handleSubmit,
@@ -32,10 +26,8 @@ export default function LoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
-
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
-
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -44,16 +36,12 @@ export default function LoginPage() {
         },
         body: JSON.stringify(data)
       });
-
       const result = await response.json();
-
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao fazer login');
       }
-
       // Login with returned data
       login(result.user, result.clinic);
-
       // Redirect to dashboard
       window.location.href = "/dashboard";
     } catch (error) {
@@ -65,10 +53,8 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-
   //         title="Entrar"
   //   subtitle="Acesse sua conta para gerenciar sua clínica"
-
   return (
     <AuthRedirect>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -89,16 +75,13 @@ export default function LoginPage() {
           />
         </div>
         {errors.email && (
-          <motion.p
+          <p
             className="mt-1 text-sm text-error"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
           >
             {errors.email.message}
-          </motion.p>
+          </p>
         )}
       </div>
-
       {/* Password Field */}
       <div>
         <label className="block text-sm font-medium text-text-primary mb-2">
@@ -127,16 +110,13 @@ export default function LoginPage() {
           </button>
         </div>
         {errors.password && (
-          <motion.p
+          <p
             className="mt-1 text-sm text-error"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
           >
             {errors.password.message}
-          </motion.p>
+          </p>
         )}
       </div>
-
       {/* Remember Me & Forgot Password */}
       <div className="flex items-center justify-between">
         <label className="flex items-center">
@@ -153,14 +133,11 @@ export default function LoginPage() {
           Esqueceu a senha?
         </Link>
       </div>
-
       {/* Submit Button */}
-      <motion.button
+      <button
         type="submit"
         disabled={isLoading}
         className={`w-full ${styles.buttonPrimary} flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-        whileHover={{ scale: isLoading ? 1 : 1.02 }}
-        whileTap={{ scale: isLoading ? 1 : 0.98 }}
       >
         {isLoading ? (
           <div className="w-5 h-5 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
@@ -170,8 +147,7 @@ export default function LoginPage() {
             <ArrowRight className="w-4 h-4" />
           </>
         )}
-      </motion.button>
-
+      </button>
       {/* Register Link */}
       <div className="text-center pt-4">
         <p className="text-sm text-text-secondary">

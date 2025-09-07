@@ -1,5 +1,4 @@
 import { useAppointments } from "@/store";
-import { motion } from "framer-motion";
 import { Calendar, Clock } from "lucide-react";
 import { Widget } from "..";
 
@@ -22,11 +21,9 @@ export function AppointmentsTodayWidget() {
 
         <div className="space-y-2 max-h-32 overflow-y-auto">
           {todayAppointments.slice(0, 3).map((appointment) => (
-            <motion.div
+            <div
               key={appointment.appointment_id}
               className="flex items-center space-x-2 p-2 bg-background-secondary rounded-md"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
             >
               <Clock className="w-4 h-4 text-text-tertiary" />
               <div className="flex-1 min-w-0">
@@ -37,7 +34,7 @@ export function AppointmentsTodayWidget() {
                   {appointment.notes || "Consulta agendada"}
                 </p>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 

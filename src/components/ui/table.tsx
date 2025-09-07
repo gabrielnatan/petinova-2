@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
@@ -51,18 +50,14 @@ export const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, ...props }, ref) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
-  
   return (
-    <motion.tr
+    <tr
       ref={ref}
       className={cn(
         "hover:bg-background-secondary transition-colors duration-200",
         className,
       )}
-      whileHover={{ backgroundColor: "var(--color-background-secondary)" }}
-      {...restProps}
+      {...props}
     />
   );
 });

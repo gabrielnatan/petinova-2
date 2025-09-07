@@ -3,7 +3,6 @@ import { useThemeStyles } from "@/components/theme-provider";
 import { AuthRedirect } from "@/components/auth-redirect";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Mail } from "lucide-react";
-import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -45,14 +44,11 @@ export default function ForgotPasswordPage() {
   if (emailSent) {
     return (
       <div className="text-center space-y-4">
-        <motion.div
+        <div
           className="w-16 h-16 bg-success rounded-full flex items-center justify-center mx-auto"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", duration: 0.5 }}
         >
           <Mail className="w-8 h-8 text-white" />
-        </motion.div>
+        </div>
 
         <div>
           <p className="text-text-primary mb-2">
@@ -63,14 +59,12 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        <motion.a
+        <a
           href="/auth/login"
           className={`inline-block ${styles.buttonPrimary} mt-4`}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
         >
           Voltar ao Login
-        </motion.a>
+        </a>
       </div>
     );
   }
@@ -96,23 +90,19 @@ export default function ForgotPasswordPage() {
           />
         </div>
         {errors.email && (
-          <motion.p
+          <p
             className="mt-1 text-sm text-error"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
           >
             {errors.email.message}
-          </motion.p>
+          </p>
         )}
       </div>
 
       {/* Submit Button */}
-      <motion.button
+      <button
         type="submit"
         disabled={isLoading}
         className={`w-full ${styles.buttonPrimary} flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-        whileHover={{ scale: isLoading ? 1 : 1.02 }}
-        whileTap={{ scale: isLoading ? 1 : 0.98 }}
       >
         {isLoading ? (
           <div className="w-5 h-5 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
@@ -122,7 +112,7 @@ export default function ForgotPasswordPage() {
             <ArrowRight className="w-4 h-4" />
           </>
         )}
-      </motion.button>
+      </button>
 
       {/* Back to Login Link */}
       <div className="text-center pt-4">

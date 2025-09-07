@@ -14,42 +14,65 @@ datasource db {
 }
 
 model Clinic {
-  id         String   @id @default(cuid())
-  legalName  String
-  tradeName  String
-  cnpj       String   @unique
-  email      String
-  phone      String?
-  address    String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
+  id        String   @id @default(cuid())
+  legalName String
+  tradeName String
+  cnpj      String   @unique
+  email     String
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relacionamentos
-  users     User[]
-  pets      Pet[]
-  guardians Guardian[]
-  
+  users              User[]
+  pets               Pet[]
+  guardians          Guardian[]
+  inventoryItems     InventoryItem[]
+  inventoryMovements InventoryMovement[]
+  prescriptions      Prescription[]
+  prescriptionItems  PrescriptionItem[]
+  auditLogs          AuditLog[]
+  laboratories       Laboratory[]
+  webhooks           Webhook[]
+  webhookAttempts    WebhookAttempt[]
+  notifications      Notification[]
+  apiKeys            ApiKey[]
+  apiRequestLogs     ApiRequestLog[]
+  performanceMetrics PerformanceMetric[]
+
   @@map("clinics")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String   @map("fullName")
-  role      UserRole @default(VETERINARIAN)
-  active    Boolean  @default(true)
-  clinicId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id                   String   @id @default(cuid())
+  email                String   @unique
+  password             String
+  name                 String   @map("fullName")
+  role                 UserRole @default(VETERINARIAN)
+  active               Boolean  @default(true)
+  clinicId             String
+  twoFactorEnabled     Boolean  @default(false)
+  twoFactorSecret      String?
+  twoFactorBackupCodes String[] // Array de códigos de backup
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
   // Relacionamentos
-  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-  consultations Consultation[]
-  appointments  Appointment[]
-  refreshTokens RefreshToken[]
-  
+  clinic                     Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  consultations              Consultation[]
+  appointments               Appointment[]
+  refreshTokens              RefreshToken[]
+  dashboardLayout            DashboardLayout?
+  inventoryMovements         InventoryMovement[]
+  prescriptions              Prescription[]
+  dispensedPrescriptionItems PrescriptionItem[]
+  auditLogs                  AuditLog[]
+  notifications              Notification[]
+  createdApiKeys             ApiKey[]            @relation("ApiKeyCreator")
+  revokedApiKeys             ApiKey[]            @relation("ApiKeyRevoker")
+
   @@map("users")
 }
 
@@ -70,13 +93,14 @@ model Pet {
   clinicId    String
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  
+
   // Relacionamentos
   guardian      Guardian       @relation(fields: [guardianId], references: [id], onDelete: Cascade)
   clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   consultations Consultation[]
   appointments  Appointment[]
-  
+  prescriptions Prescription[]
+
   @@map("pets")
 }
 
@@ -89,64 +113,104 @@ model Guardian {
   clinicId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relacionamentos
   clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   pets         Pet[]
   appointments Appointment[]
-  
+
   @@map("guardians")
 }
 
 model Consultation {
-  id          String   @id @default(cuid())
-  petId       String
+  id             String   @id @default(cuid())
+  petId          String
   veterinarianId String
-  diagnosis   String?
-  treatment   String?
-  notes       String?
-  date        DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  diagnosis      String?
+  treatment      String?
+  notes          String?
+  date           DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   // Relacionamentos
-  pet          Pet  @relation(fields: [petId], references: [id], onDelete: Cascade)
-  veterinarian User @relation(fields: [veterinarianId], references: [id])
-  
+  pet           Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian  User           @relation(fields: [veterinarianId], references: [id])
+  prescriptions Prescription[]
+
   @@map("consultations")
 }
 
 model Appointment {
-  id          String            @id @default(cuid())
-  petId       String
-  guardianId  String
+  id             String            @id @default(cuid())
+  petId          String
+  guardianId     String
   veterinarianId String
-  date        DateTime
-  status      AppointmentStatus @default(SCHEDULED)
-  notes       String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  
+  date           DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
   // Relacionamentos
   pet          Pet      @relation(fields: [petId], references: [id], onDelete: Cascade)
   guardian     Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
   veterinarian User     @relation(fields: [veterinarianId], references: [id])
-  
+
   @@map("appointments")
 }
 
 model InventoryItem {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  quantity    Int      @default(0)
-  price       Float?
-  supplier    String?
-  expiryDate  DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  id           String    @id @default(cuid())
+  name         String
+  description  String?
+  quantity     Int       @default(0)
+  price        Float?
+  supplier     String?
+  expiryDate   DateTime?
+  minimumStock Int       @default(0)
+  location     String?
+  sku          String?   @unique
+  barcode      String?
+  category     String?
+  brand        String?
+  clinicId     String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relacionamentos
+  clinic            Clinic              @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  movements         InventoryMovement[]
+  prescriptionItems PrescriptionItem[]
+
   @@map("inventory_items")
+}
+
+model InventoryMovement {
+  id             String         @id @default(cuid())
+  itemId         String
+  type           MovementType
+  quantity       Int
+  reason         String?
+  reference      String? // Número da nota fiscal, prescrição, etc.
+  referenceType  ReferenceType?
+  unitCost       Float?
+  totalCost      Float?
+  supplier       String?
+  invoiceNumber  String?
+  batchNumber    String?
+  expirationDate DateTime?
+  userId         String
+  clinicId       String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relacionamentos
+  item   InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id])
+  clinic Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_movements")
 }
 
 model RefreshToken {
@@ -157,11 +221,94 @@ model RefreshToken {
   isRevoked Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relacionamentos
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  email        String?
+  ipAddress    String?
+  userAgent    String?
+  action       String
+  details      Json?
+  success      Boolean
+  errorMessage String?
+  timestamp    DateTime @default(now())
+
+  // Relacionamentos
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clinic   Clinic? @relation(fields: [clinicId], references: [id])
+  clinicId String?
+
+  @@map("audit_logs")
+}
+
+model DashboardLayout {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  layout    Json // Armazena as configurações de layout dos widgets
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("dashboard_layouts")
+}
+
+model Prescription {
+  id                 String             @id @default(cuid())
+  consultationId     String?
+  petId              String
+  veterinarianId     String
+  prescriptionNumber String             @unique
+  status             PrescriptionStatus @default(ACTIVE)
+  notes              String?
+  instructions       String?
+  startDate          DateTime           @default(now())
+  endDate            DateTime?
+  clinicId           String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Relacionamentos
+  consultation Consultation?      @relation(fields: [consultationId], references: [id], onDelete: SetNull)
+  pet          Pet                @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian User               @relation(fields: [veterinarianId], references: [id])
+  clinic       Clinic             @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  items        PrescriptionItem[]
+
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String    @id @default(cuid())
+  prescriptionId String
+  itemId         String
+  quantity       Int
+  dosage         String? // Ex: "1 comprimido 2x ao dia"
+  frequency      String? // Ex: "A cada 8 horas"
+  duration       String? // Ex: "7 dias"
+  instructions   String?
+  isDispensed    Boolean   @default(false)
+  dispensedAt    DateTime?
+  dispensedBy    String?
+  clinicId       String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relacionamentos
+  prescription    Prescription  @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  clinic          Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  dispensedByUser User?         @relation(fields: [dispensedBy], references: [id])
+
+  @@map("prescription_items")
 }
 
 enum UserRole {
@@ -175,4 +322,163 @@ enum AppointmentStatus {
   CONFIRMED
   COMPLETED
   CANCELLED
+}
+
+enum MovementType {
+  IN // Entrada
+  OUT // Saída
+  ADJUSTMENT // Ajuste
+  TRANSFER // Transferência
+  RETURN // Devolução
+  LOSS // Perda
+}
+
+enum ReferenceType {
+  PURCHASE // Compra
+  SALE // Venda
+  PRESCRIPTION // Prescrição
+  TRANSFER // Transferência
+  ADJUSTMENT // Ajuste
+  RETURN // Devolução
+  LOSS // Perda
+}
+
+enum PrescriptionStatus {
+  ACTIVE // Ativa
+  COMPLETED // Concluída
+  CANCELLED // Cancelada
+  EXPIRED // Expirada
+}
+
+model Laboratory {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  email     String
+  phone     String?
+  address   String?
+  apiKey    String?
+  apiUrl    String?
+  isActive  Boolean  @default(true)
+  clinicId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("laboratories")
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  eventType String // Tipo de evento (APPOINTMENT_CREATED, etc.)
+  secret    String? // Chave secreta para assinatura
+  headers   Json // Headers customizados
+  isActive  Boolean  @default(true)
+  clinicId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  clinic   Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  attempts WebhookAttempt[]
+
+  @@map("webhooks")
+}
+
+model WebhookAttempt {
+  id             String   @id @default(cuid())
+  webhookId      String
+  eventType      String
+  payload        Json // Payload enviado
+  responseStatus Int // Status code da resposta
+  responseBody   String // Corpo da resposta
+  success        Boolean // Se a tentativa foi bem-sucedida
+  clinicId       String
+  createdAt      DateTime @default(now())
+
+  // Relacionamentos
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_attempts")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  title     String
+  message   String
+  type      String // Tipo de notificação (INFO, WARNING, ERROR, etc.)
+  priority  String    @default("NORMAL") // HIGH, NORMAL, LOW
+  data      Json // Dados adicionais
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  userId    String
+  clinicId  String
+  createdAt DateTime  @default(now())
+
+  // Relacionamentos
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  keyPrefix   String // Prefixo para identificação sem expor a chave completa
+  permissions String[] // Array de permissões
+  isActive    Boolean   @default(true)
+  lastUsed    DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  revokedBy   String?
+  clinicId    String
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relacionamentos
+  clinic  Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  creator User   @relation("ApiKeyCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  revoker User?  @relation("ApiKeyRevoker", fields: [revokedBy], references: [id], onDelete: SetNull)
+
+  @@map("api_keys")
+}
+
+model ApiRequestLog {
+  id           String   @id @default(cuid())
+  identifier   String // IP, user ID, ou API key
+  success      Boolean // Se a requisição foi bem-sucedida
+  responseTime Int // Tempo de resposta em ms
+  timestamp    DateTime @default(now())
+  clinicId     String?
+
+  // Relacionamentos
+  clinic Clinic? @relation(fields: [clinicId], references: [id])
+
+  @@map("api_request_logs")
+}
+
+model PerformanceMetric {
+  id           String   @id @default(cuid())
+  responseTime Int // Tempo de resposta em ms
+  memoryUsage  Int // Uso de memória em bytes
+  cpuUsage     Float // Uso de CPU em porcentagem
+  endpoint     String // Endpoint da requisição
+  method       String // Método HTTP
+  statusCode   Int // Status code da resposta
+  timestamp    DateTime @default(now())
+  userId       String? // ID do usuário (opcional)
+  clinicId     String? // ID da clínica (opcional)
+
+  // Relacionamentos
+  clinic Clinic? @relation(fields: [clinicId], references: [id])
+
+  @@map("performance_metrics")
 }

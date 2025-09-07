@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
   Lock,
@@ -18,7 +16,6 @@ import { useThemeStyles } from "@/components/theme-provider";
 import { useAuth } from "@/store";
 import { AuthRedirect } from "@/components/auth-redirect";
 import Link from "next/link";
-
 const registerSchema = z
   .object({
     name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -32,9 +29,7 @@ const registerSchema = z
     message: "Senhas não coincidem",
     path: ["confirmPassword"],
   });
-
 type RegisterFormData = z.infer<typeof registerSchema>;
-
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -42,7 +37,6 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1);
   const { login } = useAuth();
   const styles = useThemeStyles();
-
   const {
     register,
     handleSubmit,
@@ -51,21 +45,17 @@ export default function RegisterPage() {
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
-
   const nextStep = async () => {
     const isValid = await trigger(["name", "email"]);
     if (isValid) {
       setStep(2);
     }
   };
-
   const prevStep = () => {
     setStep(1);
   };
-
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
-
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -74,16 +64,12 @@ export default function RegisterPage() {
         },
         body: JSON.stringify(data)
       });
-
       const result = await response.json();
-
       if (!response.ok) {
         throw new Error(result.error || 'Erro ao criar conta');
       }
-
       // Login with returned data
       login(result.user, result.clinic);
-
       // Redirect to dashboard
       window.location.href = "/dashboard";
     } catch (error) {
@@ -124,272 +110,6 @@ export default function RegisterPage() {
           </div>
         </div>
       </div>
-
-      <AnimatePresence mode="wait">
-        {step === 1 && (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-4"
-          >
-            {/* Name Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Nome Completo
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-text-tertiary" />
-                </div>
-                <input
-                  {...register("name")}
-                  type="text"
-                  className={`${styles.input} pl-10 w-full`}
-                  placeholder="Dr. João Silva"
-                />
-              </div>
-              {errors.name && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.name.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Email Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-text-tertiary" />
-                </div>
-                <input
-                  {...register("email")}
-                  type="email"
-                  className={`${styles.input} pl-10 w-full`}
-                  placeholder="seu@email.com"
-                />
-              </div>
-              {errors.email && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.email.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Next Button */}
-            <motion.button
-              type="button"
-              onClick={nextStep}
-              className={`w-full ${styles.buttonPrimary} flex items-center justify-center space-x-2`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span>Próximo</span>
-              <ArrowRight className="w-4 h-4" />
-            </motion.button>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-4"
-          >
-            {/* Clinic Name Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Nome da Clínica
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-text-tertiary" />
-                </div>
-                <input
-                  {...register("clinicName")}
-                  type="text"
-                  className={`${styles.input} pl-10 w-full`}
-                  placeholder="Clínica Veterinária São Bento"
-                />
-              </div>
-              {errors.clinicName && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.clinicName.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* CNPJ Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                CNPJ
-              </label>
-              <input
-                {...register("cnpj")}
-                type="text"
-                className={`${styles.input} w-full`}
-                placeholder="12.345.678/0001-90"
-              />
-              {errors.cnpj && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.cnpj.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Senha
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-text-tertiary" />
-                </div>
-                <input
-                  {...register("password")}
-                  type={showPassword ? "text" : "password"}
-                  className={`${styles.input} pl-10 pr-10 w-full`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-text-tertiary" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-text-tertiary" />
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.password.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Confirm Password Field */}
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Confirmar Senha
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-text-tertiary" />
-                </div>
-                <input
-                  {...register("confirmPassword")}
-                  type={showConfirmPassword ? "text" : "password"}
-                  className={`${styles.input} pl-10 pr-10 w-full`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-text-tertiary" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-text-tertiary" />
-                  )}
-                </button>
-              </div>
-              {errors.confirmPassword && (
-                <motion.p
-                  className="mt-1 text-sm text-error"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  {errors.confirmPassword.message}
-                </motion.p>
-              )}
-            </div>
-
-            {/* Terms and Conditions */}
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                required
-                className="h-4 w-4 text-primary-600 border-border rounded focus:ring-primary-500 mt-0.5"
-              />
-              <label className="ml-2 text-sm text-text-secondary">
-                Concordo com os{" "}
-                <Link
-                  href="/terms"
-                  className="text-primary-600 hover:text-primary-500"
-                >
-                  Termos de Serviço
-                </Link>{" "}
-                e{" "}
-                <Link
-                  href="/privacy"
-                  className="text-primary-600 hover:text-primary-500"
-                >
-                  Política de Privacidade
-                </Link>
-              </label>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex space-x-3">
-              <motion.button
-                type="button"
-                onClick={prevStep}
-                className={`flex-1 ${styles.buttonSecondary}`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Voltar
-              </motion.button>
-
-              <motion.button
-                type="submit"
-                disabled={isLoading}
-                className={`flex-1 ${styles.buttonPrimary} flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed`}
-                whileHover={{ scale: isLoading ? 1 : 1.02 }}
-                whileTap={{ scale: isLoading ? 1 : 0.98 }}
-              >
-                {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-text-inverse border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span>Criar Conta</span>
-                )}
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Login Link */}
       <div className="text-center pt-4">
         <p className="text-sm text-text-secondary">

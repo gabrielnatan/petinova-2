@@ -1,43 +1,23 @@
-import { motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import { Widget } from "..";
+import { useConsultations } from "@/store";
+import { formatCurrency } from "@/lib/utils";
 
 export function RecentConsultationsWidget() {
-  // Mock data - replace with real consultation data
-  const recentConsultations = [
-    {
-      id: "1",
-      petName: "Buddy",
-      guardianName: "João Silva",
-      amount: 150,
-      time: "14:30",
-    },
-    {
-      id: "2",
-      petName: "Luna",
-      guardianName: "Maria Santos",
-      amount: 200,
-      time: "15:15",
-    },
-    {
-      id: "3",
-      petName: "Max",
-      guardianName: "Pedro Costa",
-      amount: 120,
-      time: "16:00",
-    },
-  ];
+  const { consultations } = useConsultations();
+  
+  // Pegar as 3 consultas mais recentes
+  const recentConsultations = consultations
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 3);
 
   return (
     <Widget id="recent-consultations" title="Consultas Recentes">
       <div className="space-y-3">
-        {recentConsultations.map((consultation, index) => (
-          <motion.div
-            key={consultation.id}
+        {recentConsultations.map((consultation) => (
+          <div
+            key={consultation.consultation_id}
             className="flex items-center justify-between p-3 bg-background-secondary rounded-md"
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
           >
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
@@ -45,28 +25,30 @@ export function RecentConsultationsWidget() {
               </div>
               <div>
                 <p className="text-sm font-medium text-text-primary">
-                  {consultation.petName}
+                  {consultation.pet.name}
                 </p>
                 <p className="text-xs text-text-tertiary">
-                  {consultation.guardianName}
+                  {consultation.guardian?.name || 'N/A'}
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-sm font-medium text-success">
-                R$ {consultation.amount}
+                {formatCurrency(150)} {/* Valor fixo por enquanto */}
               </p>
-              <p className="text-xs text-text-tertiary">{consultation.time}</p>
+              <p className="text-xs text-text-tertiary">
+                {new Date(consultation.created_at).toLocaleTimeString('pt-BR', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </p>
             </div>
-          </motion.div>
+          </div>
         ))}
 
-        <motion.button
-          className="w-full text-xs text-text-tertiary hover:text-text-primary transition-colors duration-200 mt-3"
-          whileHover={{ scale: 1.02 }}
-        >
+        <button className="w-full text-xs text-text-tertiary hover:text-text-primary transition-colors duration-200 mt-3">
           Ver todas as consultas →
-        </motion.button>
+        </button>
       </div>
     </Widget>
   );

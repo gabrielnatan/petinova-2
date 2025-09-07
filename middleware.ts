@@ -34,14 +34,7 @@ export function middleware(request: NextRequest) {
                           request.headers.get('Authorization')?.replace('Bearer ', '')
     
     if (!apiAccessToken || !verifyToken(apiAccessToken)) {
-      // Se não tiver access token válido, verifica se tem refresh token para renovar
-      const refreshToken = request.cookies.get('refreshToken')?.value
-      
-      if (refreshToken) {
-        // Redireciona para endpoint de refresh
-        return NextResponse.redirect(new URL('/api/auth/refresh', request.url))
-      }
-      
+      // Para APIs, apenas retorna erro 401 - o cliente deve lidar com refresh
       return NextResponse.json(
         { error: 'Token inválido ou ausente', needsRefresh: true },
         { status: 401 }

@@ -1,14 +1,14 @@
-import { motion } from "framer-motion";
 import { AlertTriangle, Package } from "lucide-react";
 import { Widget } from "..";
+import { useProducts } from "@/store";
 
 export function StockAlertsWidget() {
-  // Mock data - replace with real product data
-  const lowStockItems = [
-    { name: "Ração Premium", quantity: 2, min: 10 },
-    { name: "Vacina V8", quantity: 1, min: 5 },
-    { name: "Antipulgas", quantity: 3, min: 8 },
-  ];
+  const { products } = useProducts();
+  
+  // Filtrar produtos com estoque baixo
+  const lowStockItems = products.filter(product => 
+    product.inventory.stock <= product.inventory.minimumStock
+  ).slice(0, 3);
 
   return (
     <Widget id="stock-alerts" title="Alertas de Estoque">
@@ -21,33 +21,27 @@ export function StockAlertsWidget() {
         </div>
 
         <div className="space-y-2 max-h-32 overflow-y-auto">
-          {lowStockItems.map((item, index) => (
-            <motion.div
-              key={item.name}
+          {lowStockItems.map((item) => (
+            <div
+              key={item.product_id}
               className="flex items-center justify-between p-2 bg-background-secondary rounded-md"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text-primary truncate">
                   {item.name}
                 </p>
                 <p className="text-xs text-warning">
-                  Restam apenas {item.quantity} unidades
+                  Restam apenas {item.inventory.stock} {item.inventory.unit}
                 </p>
               </div>
               <Package className="w-4 h-4 text-warning" />
-            </motion.div>
+            </div>
           ))}
         </div>
 
-        <motion.button
-          className="w-full text-xs text-text-tertiary hover:text-text-primary transition-colors duration-200"
-          whileHover={{ scale: 1.02 }}
-        >
+        <button className="w-full text-xs text-text-tertiary hover:text-text-primary transition-colors duration-200">
           Ver todos os alertas →
-        </motion.button>
+        </button>
       </div>
     </Widget>
   );

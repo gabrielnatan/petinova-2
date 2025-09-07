@@ -1,5 +1,4 @@
 import { useThemeStyles } from "@/components/theme-provider";
-import { motion } from "framer-motion";
 import { Calendar, Heart, FileText, Package } from "lucide-react";
 import { Widget } from "..";
 
@@ -36,16 +35,11 @@ export function QuickActionsWidget() {
   return (
     <Widget id="quick-actions" title="Ações Rápidas">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {actions.map((action, index) => (
-          <motion.a
+        {actions.map((action) => (
+          <a
             key={action.label}
             href={action.href}
             className={`${styles.card} ${styles.cardHover} p-4 text-center group cursor-pointer`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
             <action.icon
               className={`w-6 h-6 mx-auto mb-2 text-${action.color}-500 group-hover:text-${action.color}-600 transition-colors duration-200`}
@@ -53,7 +47,7 @@ export function QuickActionsWidget() {
             <span className="text-xs font-medium text-text-primary group-hover:text-text-primary">
               {action.label}
             </span>
-          </motion.a>
+          </a>
         ))}
       </div>
     </Widget>

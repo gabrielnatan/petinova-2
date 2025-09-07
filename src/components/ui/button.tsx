@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { motion } from "motion/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Slot } from "@radix-ui/react-slot";
@@ -57,24 +56,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         </Slot>
       );
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
     
     return (
-      <motion.button
+      <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || loading}
-        whileHover={{ scale: disabled || loading ? 1 : 1.02 }}
-        whileTap={{ scale: disabled || loading ? 1 : 0.98 }}
-        {...restProps}
+        {...props}
       >
         {loading ? (
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
         ) : null}
         {children}
-      </motion.button>
+      </button>
     );
   },
 );

@@ -1,5 +1,19 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { dashboardService } from "../services/dashboard.service";
+
+// Função utilitária para obter títulos dos widgets
+const getWidgetTitle = (type: string): string => {
+  const titles: Record<string, string> = {
+    "appointments-today": "Consultas de Hoje",
+    "revenue-chart": "Receita",
+    "pets-count": "Total de Pets",
+    "stock-alerts": "Alertas de Estoque",
+    "recent-consultations": "Consultas Recentes",
+    "quick-actions": "Ações Rápidas"
+  };
+  return titles[type] || type;
+};
 
 // Types baseadas nas entidades do backend
 export interface User {
@@ -89,27 +103,114 @@ export interface Appointment {
 
 export interface Consultation {
   consultation_id: string;
-  description: string;
-  amount: number;
-  payment_method: string;
-  payment_plan?: number;
-  paid: boolean;
-  clinic_id: string;
-  veterinarian_id: string;
-  pet_id: string;
-  appointment_id: string;
+  appointment: {
+    appointment_id: string;
+    dateTime: string;
+    status: string;
+  };
+  pet: {
+    id: string;
+    name: string;
+    species: string;
+    breed?: string;
+    weight?: number;
+    birthDate?: string;
+    avatarUrl?: string;
+  };
+  veterinarian: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  guardian: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+  };
+  diagnosis?: string;
+  treatment?: string;
+  notes?: string;
+  date: string;
+  petHistory?: Array<{
+    id: string;
+    date: string;
+    diagnosis?: string;
+    treatment?: string;
+    veterinarian: {
+      id: string;
+      name: string;
+      role: string;
+    };
+  }>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Product {
   product_id: string;
   name: string;
-  type: string;
-  unit: string;
-  quantity: number;
-  costPrice: number;
-  salePrice: number;
-  validity?: Date;
+  description?: string;
+  sku: string;
+  barcode?: string;
+  category: string;
+  subcategory?: string;
+  brand?: string;
+  supplier?: string;
+  prices: {
+    purchase: number;
+    sale: number;
+    margin?: number;
+  };
+  inventory: {
+    stock: number;
+    minimumStock: number;
+    unit: 'un' | 'kg' | 'g' | 'l' | 'ml' | 'cx' | 'pct';
+    location?: string;
+    estimatedDaysToStock?: number;
+  };
+  details: {
+    expirationDate?: string;
+    batchNumber?: string;
+    prescriptionRequired: boolean;
+    notes?: string;
+    images?: string[];
+  };
+  stats: {
+    totalSales: number;
+    totalPurchases: number;
+    salesThisMonth?: number;
+    lastSaleDate?: string;
+    averageMonthlyUsage?: number;
+    isLowStock: boolean;
+    isExpiringSoon?: boolean;
+  };
+  recentSales?: Array<{
+    id: string;
+    quantity: number;
+    price: number;
+    createdAt: string;
+    consultation?: {
+      id: string;
+      createdAt: string;
+      pet: {
+        id: string;
+        name: string;
+      };
+    };
+  }>;
+  recentPurchases?: Array<{
+    id: string;
+    quantity: number;
+    price: number;
+    createdAt: string;
+    supplier?: string;
+    invoiceNumber?: string;
+  }>;
+  isActive: boolean;
   clinic_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Dashboard Widget Types
@@ -155,6 +256,7 @@ interface AppStore {
   setCurrentClinic: (clinic: Clinic | null) => void;
   login: (user: User, clinic: Clinic) => void;
   logout: () => void;
+  checkAuth: () => Promise<void>;
 
   // Data Actions
   setPets: (pets: Pet[]) => void;
@@ -196,6 +298,10 @@ interface AppStore {
   updateProduct: (productId: string, product: Partial<Product>) => void;
   removeProduct: (productId: string) => void;
 
+  // Data Loading Actions
+  loadConsultations: () => Promise<void>;
+  loadProducts: () => Promise<void>;
+
   // Dashboard Actions
   setDashboardWidgets: (widgets: DashboardWidget[]) => void;
   addDashboardWidget: (widget: DashboardWidget) => void;
@@ -205,6 +311,8 @@ interface AppStore {
   ) => void;
   removeDashboardWidget: (widgetId: string) => void;
   toggleWidgetVisibility: (widgetId: string) => void;
+  loadDashboardLayout: () => Promise<void>;
+  saveDashboardLayout: () => Promise<void>;
 
   // UI Actions
   toggleSidebar: () => void;
@@ -323,6 +431,38 @@ export const useAppStore = create<AppStore>()(
           
           // Redirect to login page
           window.location.href = '/auth/login';
+        }
+      },
+
+      checkAuth: async () => {
+        try {
+          const response = await fetch('/api/auth/me', {
+            method: 'GET',
+            credentials: 'include'
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            set({
+              user: data.user,
+              currentClinic: data.clinic,
+              isAuthenticated: true,
+            });
+          } else {
+            // Token inválido ou expirado
+            set({
+              user: null,
+              currentClinic: null,
+              isAuthenticated: false,
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao verificar autenticação:', error);
+          set({
+            user: null,
+            currentClinic: null,
+            isAuthenticated: false,
+          });
         }
       },
 
@@ -468,6 +608,64 @@ export const useAppStore = create<AppStore>()(
           ),
         })),
 
+      // Dashboard Server Actions
+      loadDashboardLayout: async () => {
+        try {
+          const result = await dashboardService.getLayout();
+          if (result.success && result.data) {
+            // Mapear dados da API para incluir títulos
+            const widgetsWithTitles = result.data.widgets.map(widget => ({
+              ...widget,
+              type: widget.type as DashboardWidget["type"],
+              title: getWidgetTitle(widget.type)
+            }));
+            set({ dashboardWidgets: widgetsWithTitles });
+          }
+          // Se não houver layout salvo, usar o padrão
+        } catch (error) {
+          console.error('Erro ao carregar layout do dashboard:', error);
+        }
+      },
+
+      saveDashboardLayout: async () => {
+        try {
+          const { dashboardWidgets } = get();
+          const result = await dashboardService.saveLayout({
+            widgets: dashboardWidgets
+          });
+          if (!result.success) {
+            console.error('Erro ao salvar layout:', result.error);
+          }
+        } catch (error) {
+          console.error('Erro ao salvar layout do dashboard:', error);
+        }
+      },
+
+      // Data Loading Actions
+      loadConsultations: async () => {
+        try {
+          const response = await fetch('/api/consultations?limit=100');
+          if (response.ok) {
+            const data = await response.json();
+            set({ consultations: data.consultations || [] });
+          }
+        } catch (error) {
+          console.error('Erro ao carregar consultas:', error);
+        }
+      },
+
+      loadProducts: async () => {
+        try {
+          const response = await fetch('/api/products?limit=100');
+          if (response.ok) {
+            const data = await response.json();
+            set({ products: data.products || [] });
+          }
+        } catch (error) {
+          console.error('Erro ao carregar produtos:', error);
+        }
+      },
+
       // UI Actions
       toggleSidebar: () =>
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -495,6 +693,7 @@ export const useAuth = () =>
     currentClinic: state.currentClinic,
     login: state.login,
     logout: state.logout,
+    checkAuth: state.checkAuth,
   }));
 
 export const useDashboard = () =>
@@ -505,6 +704,8 @@ export const useDashboard = () =>
     updateWidget: state.updateDashboardWidget,
     removeWidget: state.removeDashboardWidget,
     toggleWidgetVisibility: state.toggleWidgetVisibility,
+    loadDashboardLayout: state.loadDashboardLayout,
+    saveDashboardLayout: state.saveDashboardLayout,
   }));
 
 export const usePets = () =>
@@ -532,6 +733,26 @@ export const useAppointments = () =>
     addAppointment: state.addAppointment,
     updateAppointment: state.updateAppointment,
     removeAppointment: state.removeAppointment,
+  }));
+
+export const useConsultations = () =>
+  useAppStore((state) => ({
+    consultations: state.consultations,
+    setConsultations: state.setConsultations,
+    addConsultation: state.addConsultation,
+    updateConsultation: state.updateConsultation,
+    removeConsultation: state.removeConsultation,
+    loadConsultations: state.loadConsultations,
+  }));
+
+export const useProducts = () =>
+  useAppStore((state) => ({
+    products: state.products,
+    setProducts: state.setProducts,
+    addProduct: state.addProduct,
+    updateProduct: state.updateProduct,
+    removeProduct: state.removeProduct,
+    loadProducts: state.loadProducts,
   }));
 
 export const useUI = () =>
