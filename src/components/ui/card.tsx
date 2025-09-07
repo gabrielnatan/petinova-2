@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -11,18 +10,8 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, children, hover = false, ...props }, ref) => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { onDrag, onDragStart, onDragEnd, onAnimationStart, onTransitionEnd, ...restProps } = props;
-    const Component = hover ? motion.div : "div";
-    const motionProps = hover
-      ? {
-          whileHover: { scale: 1.02 },
-          transition: { duration: 0.2 },
-        }
-      : {};
-
     return (
-      <Component
+      <div
         ref={ref}
         className={cn(
           "bg-surface border border-border rounded-lg shadow-md",
@@ -30,11 +19,10 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
             "hover:shadow-lg transition-shadow duration-200 cursor-pointer",
           className,
         )}
-        {...motionProps}
-        {...restProps}
+        {...props}
       >
         {children}
-      </Component>
+      </div>
     );
   },
 );
@@ -48,6 +36,18 @@ export const CardHeader = React.forwardRef<
   <div ref={ref} className={cn("p-6 pb-0", className)} {...props} />
 ));
 CardHeader.displayName = "CardHeader";
+
+export const CardTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h3
+    ref={ref}
+    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+));
+CardTitle.displayName = "CardTitle";
 
 export const CardContent = React.forwardRef<
   HTMLDivElement,
