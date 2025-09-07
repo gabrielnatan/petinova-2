@@ -1,7 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -17,66 +15,89 @@ import {
   type ConsultationFormData,
 } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
-
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
-// import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
-// import { appointmentAPI } from "@/lib/api/appointments";
-// import { useAuth } from "@/store";
-// import { useRouter } from "next/navigation";
-
-
-
-const mockAppointments = [
-  {
-    id: "1",
-    pet: { name: "Buddy" },
-    guardian: { fullName: "João Silva" },
-    dateTime: new Date(),
-  },
-  {
-    id: "2", 
-    pet: { name: "Luna" },
-    guardian: { fullName: "Maria Santos" },
-    dateTime: new Date(),
-  },
-];
-
+import { consultationAPI, type CreateConsultationData } from "@/lib/api/consultations";
+import { appointmentAPI } from "@/lib/api/appointments";
+import { useAuth } from "@/store";
+import { useRouter } from "next/navigation";
 export default function NewConsultationPage() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [createPrescription, setCreatePrescription] = useState(false);
-
+  
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     setValue,
   } = useForm<ConsultationFormData>({
     resolver: zodResolver(consultationSchema),
     defaultValues: {},
   });
 
+  // Carregar agendamentos disponíveis
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const loadAppointments = async () => {
+      try {
+        setLoading(true);
+        const response = await appointmentAPI.getAppointments({
+          status: 'CONFIRMED',
+          limit: 100
+        });
+        setAppointments(response.appointments);
+      } catch (error) {
+        console.error('Error loading appointments:', error);
+        setError('Erro ao carregar agendamentos');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAppointments();
+  }, [isAuthenticated]);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, router]);
 
   const onSubmit = async (data: ConsultationFormData) => {
     try {
-      console.log("Consultation data:", data);
-      console.log("Selected appointment:", selectedAppointment);
-      console.log("Create prescription:", createPrescription);
+      setError(null);
+      
+      if (!selectedAppointment) {
+        setError('Selecione um agendamento');
+        return;
+      }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      window.location.href = "/dashboard/consultations";
+      const consultationData: CreateConsultationData = {
+        petId: selectedAppointment.pet_id,
+        veterinarianId: selectedAppointment.veterinarian_id,
+        diagnosis: data.diagnosis,
+        treatment: data.treatment,
+        notes: data.notes
+      };
+
+      await consultationAPI.createConsultation(consultationData);
+      router.push('/dashboard/consultations');
     } catch (error) {
       console.error("Error creating consultation:", error);
+      setError(error instanceof Error ? error.message : 'Erro ao criar consulta');
     }
   };
-
   const handleAppointmentSelect = (appointmentId: string) => {
-    const appointment = mockAppointments.find((a) => a.id === appointmentId);
+    const appointment = appointments.find((a) => a.appointment_id === appointmentId);
     setSelectedAppointment(appointment);
-    // setValue("appointment_id", appointmentId);
   };
-
   return (
     <div className="p-6  mx-auto">
       {/* Header */}
@@ -96,7 +117,28 @@ export default function NewConsultationPage() {
           </p>
         </div>
       </div>
-
+      
+      {/* Error Display */}
+      {error && (
+        <Card className="border-error">
+          <CardContent className="p-4">
+            <p className="text-error text-sm">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Loading State */}
+      {loading && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <span className="ml-2">Carregando agendamentos...</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column */}
@@ -118,14 +160,15 @@ export default function NewConsultationPage() {
                     <select
                       onChange={(e) => handleAppointmentSelect(e.target.value)}
                       className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
+                      disabled={loading}
                     >
                       <option value="">Selecione um agendamento</option>
-                      {mockAppointments.map((appointment) => (
-                        <option key={appointment.id} value={appointment.id}>
+                      {appointments.map((appointment) => (
+                        <option key={appointment.appointment_id} value={appointment.appointment_id}>
                           {appointment.pet.name} -{" "}
                           {appointment.guardian.fullName} -{" "}
-                          {appointment.dateTime.toLocaleDateString("pt-BR")}{" "}
-                          {appointment.dateTime.toLocaleTimeString("pt-BR", {
+                          {new Date(appointment.dateTime).toLocaleDateString("pt-BR")}{" "}
+                          {new Date(appointment.dateTime).toLocaleTimeString("pt-BR", {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
@@ -138,11 +181,8 @@ export default function NewConsultationPage() {
                       </p>
                     )} */}
                   </div>
-
                   {selectedAppointment && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
+                    <div
                       className="bg-background-secondary rounded-md p-4"
                     >
                       <h3 className="font-medium text-text-primary mb-2">
@@ -167,12 +207,11 @@ export default function NewConsultationPage() {
                           </span>
                         </div>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-
             {/* Consultation Details */}
             <Card>
               <CardHeader>
@@ -198,7 +237,6 @@ export default function NewConsultationPage() {
                     </p>
                   )}
                 </div>
-
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -213,7 +251,6 @@ export default function NewConsultationPage() {
               </CardContent>
             </Card>
           </div>
-
           {/* Right Column - Commented out due to schema mismatch */}
           {/* <div className="space-y-6">
             Payment Information
@@ -230,7 +267,6 @@ export default function NewConsultationPage() {
             </Card>
           </div> */}
         </div>
-
         {/* Actions */}
         <div className="flex justify-end space-x-4">
           <Button variant="secondary" asChild>

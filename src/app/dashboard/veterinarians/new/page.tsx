@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Save, User, Mail, Phone, Award, Clock } from "lucide-react";
+import { ArrowLeft, Save, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,49 +15,24 @@ import Link from "next/link";
 const veterinarianSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  phone: z.string().min(1, 'Telefone é obrigatório'),
-  crmvNumber: z.string().min(1, 'Número do CRMV é obrigatório'),
-  crmvState: z.string().min(2, 'Estado é obrigatório').max(2, 'Estado deve ter 2 caracteres'),
-  crmvIssueDate: z.string().min(1, 'Data de emissão é obrigatória'),
-  crmvExpirationDate: z.string().min(1, 'Data de expiração é obrigatória'),
-  specialty: z.string().optional(),
-  yearsOfExperience: z.string().transform(val => val ? parseInt(val) : undefined).optional(),
-  availabilitySchedule: z.array(z.string()).optional(),
-  avatarUrl: z.string().optional(),
-  notes: z.string().optional()
+  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+  confirmPassword: z.string().min(1, 'Confirmação de senha é obrigatória'),
+  role: z.enum(['VETERINARIAN', 'ASSISTANT']).default('VETERINARIAN'),
+  active: z.boolean().default(true)
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Senhas não coincidem",
+  path: ["confirmPassword"],
 });
 
 type VeterinarianFormData = z.infer<typeof veterinarianSchema>;
 
-const daysOfWeek = [
-  'Segunda-feira',
-  'Terça-feira', 
-  'Quarta-feira',
-  'Quinta-feira',
-  'Sexta-feira',
-  'Sábado',
-  'Domingo'
-];
 
-const specialties = [
-  'Clínica Geral',
-  'Cirurgia',
-  'Cardiologia',
-  'Dermatologia',
-  'Endocrinologia',
-  'Neurologia',
-  'Oftalmologia',
-  'Odontologia',
-  'Fisioterapia',
-  'Oncologia',
-  'Radiologia',
-  'Anestesiologia'
-];
 
 export default function NewVeterinarianPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const {
     register,
@@ -74,9 +49,9 @@ export default function NewVeterinarianPage() {
       const veterinarianData: CreateVeterinarianData = {
         name: data.name,
         email: data.email,
-        password: 'tempPassword123!',
-        role: 'VETERINARIAN',
-        active: true
+        password: data.password,
+        role: data.role,
+        active: data.active
       };
       
       await veterinarianAPI.createVeterinarian(veterinarianData);
@@ -84,14 +59,6 @@ export default function NewVeterinarianPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar veterinário');
     }
-  };
-
-  const handleDayToggle = (day: string) => {
-    setSelectedDays(prev => 
-      prev.includes(day) 
-        ? prev.filter(d => d !== day)
-        : [...prev, day]
-    );
   };
 
   return (
@@ -137,36 +104,23 @@ export default function NewVeterinarianPage() {
                 icon={User}
               />
 
-              <Input
-                label="Anos de Experiência"
-                type="number"
-                {...register("yearsOfExperience")}
-                error={errors.yearsOfExperience?.message}
-                placeholder="Ex: 5"
-                min="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Especialidade
-              </label>
-              <select
-                {...register("specialty")}
-                className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-              >
-                <option value="">Selecione uma especialidade</option>
-                {specialties.map(specialty => (
-                  <option key={specialty} value={specialty}>
-                    {specialty}
-                  </option>
-                ))}
-              </select>
-              {errors.specialty && (
-                <p className="text-sm text-error mt-1">
-                  {errors.specialty.message}
-                </p>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">
+                  Função
+                </label>
+                <select
+                  {...register("role")}
+                  className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
+                >
+                  <option value="VETERINARIAN">Veterinário</option>
+                  <option value="ASSISTANT">Assistente</option>
+                </select>
+                {errors.role && (
+                  <p className="text-sm text-error mt-1">
+                    {errors.role.message}
+                  </p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -175,141 +129,65 @@ export default function NewVeterinarianPage() {
         <Card>
           <CardHeader>
             <h2 className="text-xl font-semibold text-text-primary flex items-center">
-              <Phone className="w-5 h-5 mr-2" />
+              <Mail className="w-5 h-5 mr-2" />
               Informações de Contato
             </h2>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Email"
-                type="email"
-                {...register("email")}
-                error={errors.email?.message}
-                placeholder="exemplo@email.com"
-                icon={Mail}
-              />
-              
-              <Input
-                label="Telefone"
-                {...register("phone")}
-                error={errors.phone?.message}
-                placeholder="(11) 99999-9999"
-                icon={Phone}
-              />
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* CRMV Information */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-text-primary flex items-center">
-              <Award className="w-5 h-5 mr-2" />
-              Registro CRMV
-            </h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Número do CRMV"
-                {...register("crmvNumber")}
-                error={errors.crmvNumber?.message}
-                placeholder="Ex: 12345"
-              />
-              
-              <Input
-                label="Estado"
-                {...register("crmvState")}
-                error={errors.crmvState?.message}
-                placeholder="Ex: SP"
-                maxLength={2}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                label="Data de Emissão"
-                type="date"
-                {...register("crmvIssueDate")}
-                error={errors.crmvIssueDate?.message}
-              />
-              
-              <Input
-                label="Data de Expiração"
-                type="date"
-                {...register("crmvExpirationDate")}
-                error={errors.crmvExpirationDate?.message}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Availability Schedule */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-text-primary flex items-center">
-              <Clock className="w-5 h-5 mr-2" />
-              Disponibilidade Semanal
-            </h2>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-text-secondary mb-4">
-              Selecione os dias da semana em que o veterinário estará disponível:
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {daysOfWeek.map(day => (
-                <label
-                  key={day}
-                  className={`flex items-center p-3 rounded-md border cursor-pointer transition-colors ${
-                    selectedDays.includes(day)
-                      ? 'bg-primary-50 border-primary-300 text-primary-700'
-                      : 'bg-surface border-border hover:bg-background-secondary'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedDays.includes(day)}
-                    onChange={() => handleDayToggle(day)}
-                    className="sr-only"
-                  />
-                  <span className="text-sm font-medium">{day}</span>
-                </label>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Additional Information */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-text-primary">
-              Informações Adicionais
-            </h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
             <Input
-              label="URL do Avatar (opcional)"
-              {...register("avatarUrl")}
-              error={errors.avatarUrl?.message}
-              placeholder="https://exemplo.com/avatar.jpg"
+              label="Email"
+              type="email"
+              {...register("email")}
+              error={errors.email?.message}
+              placeholder="exemplo@email.com"
+              icon={Mail}
             />
-            
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-2">
-                Observações (opcional)
-              </label>
-              <textarea
-                {...register("notes")}
-                rows={4}
-                className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none resize-vertical"
-                placeholder="Informações adicionais sobre o veterinário..."
+          </CardContent>
+        </Card>
+
+        {/* Security Information */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-text-primary flex items-center">
+              <Lock className="w-5 h-5 mr-2" />
+              Informações de Segurança
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="relative">
+              <Input
+                label="Senha"
+                type={showPassword ? "text" : "password"}
+                {...register("password")}
+                error={errors.password?.message}
+                placeholder="Mínimo 8 caracteres"
+                icon={Lock}
               />
-              {errors.notes && (
-                <p className="text-sm text-error mt-1">
-                  {errors.notes.message}
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <div className="relative">
+              <Input
+                label="Confirmar Senha"
+                type={showConfirmPassword ? "text" : "password"}
+                {...register("confirmPassword")}
+                error={errors.confirmPassword?.message}
+                placeholder="Confirme sua senha"
+                icon={Lock}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-tertiary hover:text-text-primary"
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </CardContent>
         </Card>

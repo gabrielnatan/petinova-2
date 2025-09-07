@@ -1,234 +1,89 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Save,
   User,
   Mail,
-  Phone,
-  Stethoscope,
-  Award,
-  Clock,
-  X,
-  AlertTriangle,
   Trash2,
-  Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { veterinarianAPI, type Veterinarian } from "@/lib/api/veterinarians";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-// Mock data - replace with actual data fetching
-const mockVeterinarian = {
-  veterinarian_id: "1",
-  fullName: "Dra. Maria Santos",
-  crmv: {
-    number: "12345",
-    state: "SP",
-    issueDate: new Date("2015-06-15"),
-    expirationDate: new Date("2025-06-15"),
-  },
-  email: "maria.santos@clinica.com",
-  phoneNumber: "11987654321",
-  yearsOfExperience: 8,
-  specialties: ["Clínica Geral", "Cirurgia", "Cardiologia"],
-  availabilitySchedule: [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-  ],
-  biography:
-    "Veterinária especializada em clínica geral e cirurgia com mais de 8 anos de experiência. Formada pela FMVZ-USP, possui especialização em cardiologia veterinária e é membro da ANCLIVEPA.",
-  created_at: new Date("2015-06-20"),
+const veterinarianUpdateSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório'),
+  email: z.string().email('Email inválido'),
+  role: z.enum(['VETERINARIAN', 'ASSISTANT']),
+  active: z.boolean()
+});
 
-  // Weekly schedule
-  weeklySchedule: {
-    Monday: { start: "08:00", end: "17:00", enabled: true },
-    Tuesday: { start: "08:00", end: "17:00", enabled: true },
-    Wednesday: { start: "08:00", end: "17:00", enabled: true },
-    Thursday: { start: "08:00", end: "17:00", enabled: true },
-    Friday: { start: "08:00", end: "16:00", enabled: true },
-    Saturday: { start: "08:00", end: "12:00", enabled: false },
-    Sunday: { start: "08:00", end: "12:00", enabled: false },
-  },
-};
+type VeterinarianUpdateData = z.infer<typeof veterinarianUpdateSchema>;
 
-const availableSpecialties = [
-  "Clínica Geral",
-  "Cirurgia",
-  "Cardiologia",
-  "Dermatologia",
-  "Oftalmologia",
-  "Neurologia",
-  "Oncologia",
-  "Ortopedia",
-  "Anestesiologia",
-  "Medicina Intensiva",
-  "Reprodução Animal",
-  "Medicina Felina",
-  "Medicina Aviária",
-  "Medicina de Animais Silvestres",
-];
-
-const brazilianStates = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-];
-
-const formatDate = (date: any) => {
-  return date.toISOString().split("T")[0];
-};
-
-const getDayName = (day: any) => {
-  const days = {
-    Monday: "Segunda-feira",
-    Tuesday: "Terça-feira",
-    Wednesday: "Quarta-feira",
-    Thursday: "Quinta-feira",
-    Friday: "Sexta-feira",
-    Saturday: "Sábado",
-    Sunday: "Domingo",
-  };
-  return (days as any)[day] || day;
-};
-
-export default function EditVeterinarianPage({ params }:{ params:any }) {
-  const [formData, setFormData] = useState({
-    fullName: mockVeterinarian.fullName,
-    email: mockVeterinarian.email,
-    phoneNumber: mockVeterinarian.phoneNumber,
-    biography: mockVeterinarian.biography,
-    crmvNumber: mockVeterinarian.crmv.number,
-    crmvState: mockVeterinarian.crmv.state,
-    crmvIssueDate: formatDate(mockVeterinarian.crmv.issueDate),
-    crmvExpirationDate: formatDate(mockVeterinarian.crmv.expirationDate),
-  });
-
-  const [specialties, setSpecialties] = useState(mockVeterinarian.specialties);
-  const [schedule, setSchedule] = useState(mockVeterinarian.weeklySchedule);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+export default function EditVeterinarianPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter();
+  const [veterinarian, setVeterinarian] = useState<Veterinarian | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch
+  } = useForm<VeterinarianUpdateData>({
+    resolver: zodResolver(veterinarianUpdateSchema)
+  });
 
-  const addSpecialty = (specialty: string) => {
-    if (!specialties.includes(specialty)) {
-      setSpecialties((prev) => [...prev, specialty]);
-    }
-  };
+  const watchedRole = watch("role");
+  const watchedActive = watch("active");
 
-  const removeSpecialty = (specialty: string) => {
-    setSpecialties((prev) => prev.filter((s) => s !== specialty));
-  };
-
-  const updateSchedule = (day: string, field: string, value: string | boolean) => {
-    setSchedule((prev) => ({
-      ...prev,
-      [day]: {
-        ...(prev as any)[day],
-        [field]: value,
-      },
-    }));
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.fullName.trim()) newErrors.fullName = "Nome é obrigatório";
-    if (!formData.email.trim()) newErrors.email = "Email é obrigatório";
-    if (!formData.phoneNumber.trim())
-      newErrors.phoneNumber = "Telefone é obrigatório";
-    if (!formData.crmvNumber.trim())
-      newErrors.crmvNumber = "Número do CRMV é obrigatório";
-    if (!formData.crmvState)
-      newErrors.crmvState = "Estado do CRMV é obrigatório";
-    if (!formData.crmvIssueDate)
-      newErrors.crmvIssueDate = "Data de emissão é obrigatória";
-    if (!formData.crmvExpirationDate)
-      newErrors.crmvExpirationDate = "Data de validade é obrigatória";
-
-    if (specialties.length === 0) {
-      newErrors.specialties = "Adicione pelo menos uma especialidade";
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (formData.email && !emailRegex.test(formData.email)) {
-      newErrors.email = "Email inválido";
-    }
-
-    // Validate CRMV expiration date
-    if (formData.crmvExpirationDate && formData.crmvIssueDate) {
-      if (
-        new Date(formData.crmvExpirationDate) <=
-        new Date(formData.crmvIssueDate)
-      ) {
-        newErrors.crmvExpirationDate =
-          "Data de validade deve ser posterior à data de emissão";
+  // Carregar dados do veterinário
+  useEffect(() => {
+    const loadVeterinarian = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const resolvedParams = await params;
+        const response = await veterinarianAPI.getVeterinarian(resolvedParams.id);
+        const vet = response.veterinarian;
+        setVeterinarian(vet);
+        
+        // Preencher formulário com dados existentes
+        setValue("name", vet.fullName);
+        setValue("email", vet.email);
+        setValue("role", vet.role as 'VETERINARIAN' | 'ASSISTANT');
+        setValue("active", vet.isActive);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar veterinário');
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    loadVeterinarian();
+  }, [params, setValue]);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: VeterinarianUpdateData) => {
     try {
-      const veterinarianData = {
-        ...formData,
-        specialties,
-        schedule,
-        updated_at: new Date(),
-      };
-
-      console.log("Updating veterinarian:", veterinarianData);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      alert("Veterinário atualizado com sucesso!");
-      // Redirect to veterinarian details
-      // window.location.href = `/dashboard/veterinarians/${params.id}`;
-    } catch (error) {
-      console.error("Error updating veterinarian:", error);
-      alert("Erro ao atualizar veterinário. Tente novamente.");
+      setIsSubmitting(true);
+      setError(null);
+      const resolvedParams = await params;
+      
+      await veterinarianAPI.updateVeterinarian(resolvedParams.id, data);
+      router.push('/dashboard/veterinarians');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar veterinário');
     } finally {
       setIsSubmitting(false);
     }
@@ -236,427 +91,230 @@ export default function EditVeterinarianPage({ params }:{ params:any }) {
 
   const handleDelete = async () => {
     try {
-      console.log("Deleting veterinarian:", params.id);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      alert("Veterinário removido com sucesso!");
-      // window.location.href = '/dashboard/veterinarians';
-    } catch (error) {
-      console.error("Error deleting veterinarian:", error);
-      alert("Erro ao remover veterinário. Tente novamente.");
+      setIsSubmitting(true);
+      setError(null);
+      const resolvedParams = await params;
+      
+      await veterinarianAPI.deleteVeterinarian(resolvedParams.id);
+      router.push('/dashboard/veterinarians');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir veterinário');
+    } finally {
+      setIsSubmitting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex justify-center items-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4"></div>
+            <p className="text-text-secondary">Carregando veterinário...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-error mb-4">{error}</div>
+          <Button asChild>
+            <Link href="/dashboard/veterinarians">Voltar para Veterinários</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!veterinarian) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-error mb-4">Veterinário não encontrado</div>
+          <Button asChild>
+            <Link href="/dashboard/veterinarians">Voltar para Veterinários</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 max-w-6xl mx-auto bg-background min-h-screen">
+    <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/veterinarians" className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
+            </Link>
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
               Editar Veterinário
             </h1>
             <p className="text-text-secondary">
-              {mockVeterinarian.fullName} • CRMV {mockVeterinarian.crmv.number}/
-              {mockVeterinarian.crmv.state}
+              Atualize as informações do veterinário
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
-          <Button variant="error" onClick={() => setShowDeleteConfirm(true)}>
+          <Button
+            variant="error"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isSubmitting}
+            className="flex items-center"
+          >
             <Trash2 className="w-4 h-4 mr-2" />
             Excluir
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Form */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Personal Information */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-text-primary flex items-center">
-                <User className="w-5 h-5 mr-2" />
-                Informações Pessoais
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      {/* Error Alert */}
+      {error && (
+        <div className="mb-6 p-4 bg-error/10 border border-error/20 rounded-md">
+          <div className="flex items-center">
+            <AlertTriangle className="w-5 h-5 text-error mr-2" />
+            <p className="text-error">{error}</p>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Personal Information */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-text-primary flex items-center">
+              <User className="w-5 h-5 mr-2" />
+              Informações Pessoais
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Nome Completo"
-                value={formData.fullName}
-                onChange={(e) => handleInputChange("fullName", e.target.value)}
-                error={errors.fullName}
-                required
-                icon={User}
+                {...register("name")}
+                error={errors.name?.message}
                 placeholder="Ex: Dr. João Silva"
+                icon={User}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  error={errors.email}
-                  required
-                  icon={Mail}
-                  placeholder="exemplo@email.com"
-                />
-
-                <Input
-                  label="Telefone"
-                  value={formData.phoneNumber}
-                  onChange={(e) =>
-                    handleInputChange("phoneNumber", e.target.value)
-                  }
-                  error={errors.phoneNumber}
-                  required
-                  icon={Phone}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-2">
-                  Biografia
+                  Função
                 </label>
-                <textarea
-                  value={formData.biography}
-                  onChange={(e) =>
-                    handleInputChange("biography", e.target.value)
-                  }
-                  rows={4}
-                  className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none resize-vertical"
-                  placeholder="Descreva a experiência e qualificações do veterinário..."
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* CRMV Information */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-text-primary flex items-center">
-                <Award className="w-5 h-5 mr-2" />
-                Informações do CRMV
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Número do CRMV"
-                  value={formData.crmvNumber}
-                  onChange={(e) =>
-                    handleInputChange("crmvNumber", e.target.value)
-                  }
-                  error={errors.crmvNumber}
-                  required
-                  placeholder="Ex: 12345"
-                />
-
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">
-                    Estado <span className="text-error">*</span>
-                  </label>
-                  <select
-                    value={formData.crmvState}
-                    onChange={(e) =>
-                      handleInputChange("crmvState", e.target.value)
-                    }
-                    className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-                  >
-                    <option value="">Selecione o estado</option>
-                    {brazilianStates.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.crmvState && (
-                    <p className="text-sm text-error mt-1">
-                      {errors.crmvState}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Data de Emissão"
-                  type="date"
-                  value={formData.crmvIssueDate}
-                  onChange={(e) =>
-                    handleInputChange("crmvIssueDate", e.target.value)
-                  }
-                  error={errors.crmvIssueDate}
-                  required
-                />
-
-                <Input
-                  label="Data de Validade"
-                  type="date"
-                  value={formData.crmvExpirationDate}
-                  onChange={(e) =>
-                    handleInputChange("crmvExpirationDate", e.target.value)
-                  }
-                  error={errors.crmvExpirationDate}
-                  required
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Specialties */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-text-primary flex items-center">
-                <Stethoscope className="w-5 h-5 mr-2" />
-                Especialidades
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Current Specialties */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
-                  Especialidades Atuais
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {specialties.map((specialty) => (
-                    <span
-                      key={specialty}
-                      className="inline-flex items-center px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm"
-                    >
-                      {specialty}
-                      <button
-                        onClick={() => removeSpecialty(specialty)}
-                        className="ml-2 text-primary-600 hover:text-primary-800"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {specialties.length === 0 && (
-                    <p className="text-text-tertiary text-sm">
-                      Nenhuma especialidade adicionada
-                    </p>
-                  )}
-                </div>
-                {errors.specialties && (
+                <select
+                  {...register("role")}
+                  className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
+                >
+                  <option value="VETERINARIAN">Veterinário</option>
+                  <option value="ASSISTANT">Assistente</option>
+                </select>
+                {errors.role && (
                   <p className="text-sm text-error mt-1">
-                    {errors.specialties}
+                    {errors.role.message}
                   </p>
                 )}
               </div>
+            </div>
 
-              {/* Add Specialty */}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">
-                  Adicionar Especialidade
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {availableSpecialties
-                    .filter((specialty) => !specialties.includes(specialty))
-                    .map((specialty) => (
-                      <button
-                        key={specialty}
-                        onClick={() => addSpecialty(specialty)}
-                        className="text-left px-3 py-2 text-sm border border-border rounded-md hover:bg-background-secondary transition-colors"
-                      >
-                        {specialty}
-                      </button>
-                    ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">
+                Status
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  {...register("active")}
+                  className="mr-2"
+                />
+                <span className="text-sm text-text-secondary">Ativo</span>
+              </label>
+              {errors.active && (
+                <p className="text-sm text-error mt-1">
+                  {errors.active.message}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Schedule */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-text-primary flex items-center">
-                <Clock className="w-5 h-5 mr-2" />
-                Horários de Trabalho
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(schedule).map(([day, daySchedule]) => (
-                <div
-                  key={day}
-                  className="flex items-center space-x-4 p-3 bg-background-secondary rounded-lg"
-                >
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={daySchedule.enabled}
-                      onChange={(e) =>
-                        updateSchedule(day, "enabled", e.target.checked)
-                      }
-                      className="w-4 h-4 text-primary-600 border-border rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-text-primary min-w-[100px]">
-                      {getDayName(day)}
-                    </span>
-                  </div>
-
-                  {daySchedule.enabled ? (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="time"
-                        value={daySchedule.start}
-                        onChange={(e) =>
-                          updateSchedule(day, "start", e.target.value)
-                        }
-                        className="bg-surface border border-border rounded px-2 py-1 text-sm text-text-primary focus:border-border-focus focus:outline-none"
-                      />
-                      <span className="text-text-secondary">às</span>
-                      <input
-                        type="time"
-                        value={daySchedule.end}
-                        onChange={(e) =>
-                          updateSchedule(day, "end", e.target.value)
-                        }
-                        className="bg-surface border border-border rounded px-2 py-1 text-sm text-text-primary focus:border-border-focus focus:outline-none"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-text-tertiary text-sm">
-                      Não trabalha
-                    </span>
-                  )}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        {/* Contact Information */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-text-primary flex items-center">
+              <Mail className="w-5 h-5 mr-2" />
+              Informações de Contato
+            </h2>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              label="Email"
+              type="email"
+              {...register("email")}
+              error={errors.email?.message}
+              placeholder="exemplo@email.com"
+              icon={Mail}
+            />
+          </CardContent>
+        </Card>
+        
+        {/* Actions */}
+        <div className="flex justify-end space-x-4">
+          <Button variant="secondary" asChild>
+            <Link href="/dashboard/veterinarians" className="flex items-center justify-center">
+              Cancelar
+            </Link>
+          </Button>
+          <Button
+            type="submit"
+            loading={isSubmitting}
+            className="flex items-center"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
+          </Button>
         </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Actions */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-text-primary">Ações</h3>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={handleSubmit}
-                loading={isSubmitting}
-                className="w-full"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                {isSubmitting ? "Salvando..." : "Salvar Alterações"}
-              </Button>
-
-              <Button variant="secondary" className="w-full">
-                <Calendar className="w-4 h-4 mr-2" />
-                Ver Agenda
-              </Button>
-
-              <Button variant="secondary" className="w-full">
-                Cancelar Edição
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Information */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold text-text-primary">
-                Informações
-              </h3>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">ID:</span>
-                <span className="text-text-primary font-medium">
-                  #{params.id}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Cadastrado em:</span>
-                <span className="text-text-primary">
-                  {mockVeterinarian.created_at.toLocaleDateString("pt-BR")}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Experiência:</span>
-                <span className="text-text-primary">
-                  {mockVeterinarian.yearsOfExperience} anos
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Warning */}
-          <Card className="border-warning bg-warning/5">
-            <CardContent className="p-4">
-              <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-warning mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-warning mb-1">Atenção</h4>
-                  <p className="text-sm text-text-secondary">
-                    Alterações nos dados do CRMV podem afetar a validade do
-                    registro profissional.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      </form>
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-neutral-900 bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-surface rounded-lg p-6 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-error/10 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6 text-error" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary">
-                  Excluir Veterinário
-                </h3>
-                <p className="text-sm text-text-secondary">
-                  Esta ação não pode ser desfeita
-                </p>
-              </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-surface p-6 rounded-lg max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-error mr-3" />
+              <h3 className="text-lg font-semibold text-text-primary">
+                Confirmar Exclusão
+              </h3>
             </div>
-
             <p className="text-text-secondary mb-6">
-              Tem certeza que deseja excluir permanentemente{" "}
-              <strong>{mockVeterinarian.fullName}</strong>? Todos os dados
-              associados serão perdidos.
+              Tem certeza que deseja excluir o veterinário <strong>{veterinarian.fullName}</strong>? Esta ação não pode ser desfeita.
             </p>
-
             <div className="flex justify-end space-x-3">
               <Button
                 variant="secondary"
                 onClick={() => setShowDeleteConfirm(false)}
+                disabled={isSubmitting}
               >
                 Cancelar
               </Button>
-              <Button variant="error" onClick={handleDelete}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Excluir
+              <Button
+                variant="error"
+                onClick={handleDelete}
+                loading={isSubmitting}
+              >
+                {isSubmitting ? 'Excluindo...' : 'Excluir'}
               </Button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

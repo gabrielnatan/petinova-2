@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -34,14 +32,12 @@ import {
 import { formatPhone } from "@/lib/utils";
 import { guardianAPI, type Guardian } from "@/lib/api/guardians";
 import Link from "next/link";
-
 interface PaginationInfo {
   page: number;
   limit: number;
   total: number;
   pages: number;
 }
-
 function GuardianCard({ 
   guardian, 
   onDelete, 
@@ -52,18 +48,12 @@ function GuardianCard({
   deleting: boolean;
 }) {
   const [showMenu, setShowMenu] = useState(false);
-
   const formatAddress = (address: Guardian['address']) => {
     if (!address) return 'Endereço não informado';
     return address;
   };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -5 }}
-      transition={{ duration: 0.2 }}
+    <div
     >
       <Card className="hover:shadow-lg transition-shadow duration-200 relative">
         <CardContent className="p-6">
@@ -83,7 +73,6 @@ function GuardianCard({
                 )} */}
               </div>
             </div>
-
             <div className="relative">
               <Button
                 variant="ghost"
@@ -93,13 +82,9 @@ function GuardianCard({
               >
                 <MoreVertical className="w-4 h-4" />
               </Button>
-
               {showMenu && (
-                <motion.div
+                <div
                   className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[150px]"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
                 >
                   <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
                     <Link href={`/dashboard/guardians/${guardian.guardian_id}`} className="flex items-center">
@@ -127,11 +112,10 @@ function GuardianCard({
                     )}
                     {deleting ? 'Excluindo...' : 'Excluir'}
                   </Button>
-                </motion.div>
+                </div>
               )}
             </div>
           </div>
-
           <div className="space-y-2">
             <div className="flex items-center text-sm text-text-secondary">
               <Mail className="w-4 h-4 mr-2" />
@@ -152,7 +136,6 @@ function GuardianCard({
               {guardian.petsCount || 0} pet{(guardian.petsCount || 0) !== 1 ? "s" : ""}
             </div>
           </div>
-
           {/* Pets Preview */}
           {guardian.pets && guardian.pets.length > 0 && (
             <div className="mt-4">
@@ -176,10 +159,9 @@ function GuardianCard({
           )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
-
 export default function GuardiansListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -195,7 +177,6 @@ export default function GuardiansListPage() {
   });
   const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-
   const loadGuardians = useCallback(async (page = 1, search = "") => {
     try {
       setLoading(true);
@@ -214,38 +195,30 @@ export default function GuardiansListPage() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     loadGuardians(1);
   }, []);
-
   useEffect(() => {
     if (searchDebounce) {
       clearTimeout(searchDebounce);
     }
-
     const timeout = setTimeout(() => {
       setCurrentPage(1);
       loadGuardians(1, searchTerm);
     }, 500);
-
     setSearchDebounce(timeout);
-
     return () => {
       if (timeout) clearTimeout(timeout);
     };
   }, [searchTerm, loadGuardians]);
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     loadGuardians(page, searchTerm);
   };
-
   const handleDelete = async (guardianId: string, guardianName: string) => {
     if (!window.confirm(`Tem certeza que deseja excluir o tutor ${guardianName}?`)) {
       return;
     }
-
     try {
       setDeleting(guardianId);
       await guardianAPI.deleteGuardian(guardianId);
@@ -256,7 +229,6 @@ export default function GuardiansListPage() {
       setDeleting(null);
     }
   };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -274,7 +246,6 @@ export default function GuardiansListPage() {
           </Link>
         </Button>
       </div>
-
       {/* Filters */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -286,13 +257,11 @@ export default function GuardiansListPage() {
               icon={Search}
             />
           </div>
-
           <Button variant="secondary" className="flex items-center">
             <Filter className="w-4 h-4 mr-2" />
             Filtros
           </Button>
         </div>
-
         <div className="flex items-center border border-border rounded-md">
           <Button
             variant={viewMode === "cards" ? "primary" : "ghost"}
@@ -312,7 +281,6 @@ export default function GuardiansListPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -328,7 +296,6 @@ export default function GuardiansListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -342,7 +309,6 @@ export default function GuardiansListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -362,7 +328,6 @@ export default function GuardiansListPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Content */}
       {viewMode === "cards" && (
         <>
@@ -384,21 +349,17 @@ export default function GuardiansListPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {guardians.map((guardian, index) => (
-                  <motion.div
+                  <div
                     key={guardian.guardian_id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
                   >
                     <GuardianCard 
                       guardian={guardian} 
                       onDelete={handleDelete}
                       deleting={deleting === guardian.guardian_id}
                     />
-                  </motion.div>
+                  </div>
                 ))}
               </div>
-              
               {pagination.pages > 1 && (
                 <div className="flex items-center justify-between mt-8">
                   <div className="text-sm text-text-secondary">
@@ -414,11 +375,9 @@ export default function GuardiansListPage() {
                       <ChevronLeft className="w-4 h-4" />
                       Anterior
                     </Button>
-                    
                     {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
                       const page = i + Math.max(1, currentPage - 2);
                       if (page > pagination.pages) return null;
-                      
                       return (
                         <Button
                           key={page}
@@ -431,7 +390,6 @@ export default function GuardiansListPage() {
                         </Button>
                       );
                     })}
-                    
                     <Button
                       variant="secondary"
                       size="sm"
@@ -448,7 +406,6 @@ export default function GuardiansListPage() {
           )}
         </>
       )}
-
       {viewMode === "table" && (
         <Card>
           <CardContent className="p-0">
@@ -527,7 +484,6 @@ export default function GuardiansListPage() {
           </CardContent>
         </Card>
       )}
-
       {!loading && !error && guardians.length === 0 && (
         <div className="text-center py-12">
           <User className="w-12 h-12 text-text-tertiary mx-auto mb-4" />

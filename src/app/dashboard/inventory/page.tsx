@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -31,7 +29,6 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { productAPI, type Product } from "@/lib/api/products";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
 function ProductCard({ 
   product, 
   onDelete 
@@ -41,7 +38,6 @@ function ProductCard({
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
-
   const getStockStatus = () => {
     if (product.inventory.stock <= product.inventory.minimumStock) {
       return {
@@ -66,15 +62,12 @@ function ProductCard({
       label: "Estoque OK",
     };
   };
-
   const getValidityStatus = () => {
     if (!product.details.expirationDate) return null;
-
     const expirationDate = new Date(product.details.expirationDate);
     const now = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
     if (expirationDate < now) {
       return { status: "expired", color: "text-error", label: "Vencido" };
     }
@@ -87,16 +80,10 @@ function ProductCard({
     }
     return { status: "valid", color: "text-success", label: "Válido" };
   };
-
   const stockStatus = getStockStatus();
   const validityStatus = getValidityStatus();
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+    <div
     >
       <Card className="hover:shadow-lg transition-shadow duration-200">
         <CardContent className="p-4">
@@ -114,7 +101,6 @@ function ProductCard({
                 </p>
               </div>
             </div>
-
             <div className="relative">
               <Button
                 variant="ghost"
@@ -124,13 +110,9 @@ function ProductCard({
               >
                 <MoreVertical className="w-4 h-4" />
               </Button>
-
               {showMenu && (
-                <motion.div
+                <div
                   className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[150px]"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
                 >
                   <button
                     onClick={() => router.push(`/dashboard/inventory/${product.product_id}`)}
@@ -157,11 +139,10 @@ function ProductCard({
                     <Trash2 className="w-4 h-4 mr-2" />
                     Excluir
                   </button>
-                </motion.div>
+                </div>
               )}
             </div>
           </div>
-
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-secondary">Estoque:</span>
@@ -176,7 +157,6 @@ function ProductCard({
                 </span>
               </div>
             </div>
-
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-secondary">
                 Preço venda:
@@ -185,7 +165,6 @@ function ProductCard({
                 {formatCurrency(product.prices.sale)}
               </span>
             </div>
-
             {validityStatus && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-text-secondary">Validade:</span>
@@ -194,14 +173,12 @@ function ProductCard({
                 </span>
               </div>
             )}
-
             <div className="flex items-center justify-between text-xs text-text-tertiary">
               <span>Custo: {formatCurrency(product.prices.purchase)}</span>
               <span>
                 Margem: {product.prices.margin?.toFixed(1) || 0}%
               </span>
             </div>
-
             {product.stats.isLowStock && (
               <div className="flex items-center space-x-1 p-2 bg-error/5 rounded border border-error/20">
                 <AlertTriangle className="w-4 h-4 text-error" />
@@ -211,10 +188,9 @@ function ProductCard({
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
-
 export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -235,28 +211,21 @@ export default function InventoryPage() {
     lowStockItems: 0,
     expiringSoonItems: 0
   });
-
   const router = useRouter();
-
   const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
       const params: any = {
         page: pagination.page,
         limit: pagination.limit,
       };
-
       if (searchTerm) params.search = searchTerm;
       if (categoryFilter !== 'all') params.category = categoryFilter;
-      
       if (statusFilter === 'low_stock') params.lowStock = true;
       if (statusFilter === 'active') params.isActive = true;
       if (statusFilter === 'inactive') params.isActive = false;
-
       const response = await productAPI.getProducts(params);
-
       setProducts(response.products);
       setPagination(response.pagination);
     } catch (err) {
@@ -265,7 +234,6 @@ export default function InventoryPage() {
       setLoading(false);
     }
   }, [pagination.page, pagination.limit, searchTerm, categoryFilter, statusFilter]);
-
   const loadStats = useCallback(async () => {
     try {
       const report = await productAPI.getInventoryReport();
@@ -279,13 +247,10 @@ export default function InventoryPage() {
       console.error('Erro ao carregar estatísticas:', err);
     }
   }, []);
-
   useEffect(() => {
     loadProducts();
     loadStats();
   }, [loadProducts, loadStats]);
-
-
   const handleDelete = async (productId: string) => {
     try {
       await productAPI.deleteProduct(productId);
@@ -295,18 +260,15 @@ export default function InventoryPage() {
       alert(err instanceof Error ? err.message : 'Erro ao excluir produto');
     }
   };
-
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
-
   const handleFilterChange = (filter: string, value: string) => {
     if (filter === 'category') setCategoryFilter(value);
     if (filter === 'status') setStatusFilter(value);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
-
   const getStockStatus = (product: Product) => {
     if (product.inventory.stock <= product.inventory.minimumStock) {
       return {
@@ -331,15 +293,12 @@ export default function InventoryPage() {
       label: "Estoque OK",
     };
   };
-
   const getValidityStatus = (expirationDate?: string) => {
     if (!expirationDate) return null;
-
     const expDate = new Date(expirationDate);
     const now = new Date();
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
     if (expDate < now) {
       return { status: "expired", color: "text-error", label: "Vencido" };
     }
@@ -352,7 +311,6 @@ export default function InventoryPage() {
     }
     return { status: "valid", color: "text-success", label: "Válido" };
   };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -378,7 +336,6 @@ export default function InventoryPage() {
           </Button>
         </div>
       </div>
-
       {/* Error State */}
       {error && (
         <Card className="border-error">
@@ -398,7 +355,6 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -414,7 +370,6 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -430,7 +385,6 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -448,7 +402,6 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -463,7 +416,6 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Filters */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -475,7 +427,6 @@ export default function InventoryPage() {
               icon={Search}
             />
           </div>
-
           <select
             value={categoryFilter}
             onChange={(e) => handleFilterChange('category', e.target.value)}
@@ -488,7 +439,6 @@ export default function InventoryPage() {
             <option value="Acessório">Acessórios</option>
             <option value="Equipamento">Equipamentos</option>
           </select>
-
           <select
             value={statusFilter}
             onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -500,7 +450,6 @@ export default function InventoryPage() {
             <option value="inactive">Inativos</option>
           </select>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button
             variant={viewMode === "cards" ? "primary" : "ghost"}
@@ -518,7 +467,6 @@ export default function InventoryPage() {
           </Button>
         </div>
       </div>
-
       {/* Content */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -538,14 +486,11 @@ export default function InventoryPage() {
       ) : viewMode === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {products.map((product, index) => (
-            <motion.div
+            <div
               key={product.product_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
             >
               <ProductCard product={product} onDelete={handleDelete} />
-            </motion.div>
+            </div>
           ))}
         </div>
       ) : (
@@ -566,7 +511,6 @@ export default function InventoryPage() {
               {products.map((product) => {
                 const stockStatus = getStockStatus(product);
                 const validityStatus = getValidityStatus(product.details.expirationDate);
-
                 return (
                   <TableRow key={product.product_id}>
                     <TableCell>
@@ -648,7 +592,6 @@ export default function InventoryPage() {
           </Table>
         </Card>
       )}
-
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex items-center justify-between">
@@ -680,7 +623,6 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
-
       {!loading && products.length === 0 && (
         <div className="text-center py-12">
           <Package className="w-12 h-12 text-text-tertiary mx-auto mb-4" />

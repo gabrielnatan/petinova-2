@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { veterinarianAPI, type Veterinarian } from "@/lib/api/veterinarians";
+import { useAuth } from "@/store";
 import {
   ArrowLeft,
   Edit,
@@ -27,7 +28,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
 // Mock data - replace with actual data fetching
 const mockVeterinarian = {
   veterinarian_id: "1",
@@ -50,7 +50,6 @@ const mockVeterinarian = {
     "Friday",
   ],
   created_at: new Date("2015-06-20"),
-
   // Additional profile info
   biography:
     "Veterinária especializada em clínica geral e cirurgia com mais de 8 anos de experiência. Formada pela FMVZ-USP, possui especialização em cardiologia veterinária e é membro da ANCLIVEPA.",
@@ -66,7 +65,6 @@ const mockVeterinarian = {
       year: "2018",
     },
   ],
-
   // Statistics
   stats: {
     totalConsultations: 1250,
@@ -74,7 +72,6 @@ const mockVeterinarian = {
     averageRating: 4.9,
     thisMonthConsultations: 45,
   },
-
   // Recent appointments
   recentAppointments: [
     {
@@ -102,7 +99,6 @@ const mockVeterinarian = {
       status: "scheduled",
     },
   ],
-
   // Schedule
   weeklySchedule: {
     Monday: { start: "08:00", end: "17:00" },
@@ -114,11 +110,9 @@ const mockVeterinarian = {
     Sunday: null,
   },
 };
-
 const formatCRMV = (crmv: any) => {
   return `${crmv.number}/${crmv.state}`;
 };
-
 const formatDateTime = (date: Date) => {
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -128,7 +122,6 @@ const formatDateTime = (date: Date) => {
     minute: "2-digit",
   });
 };
-
 const formatDate = (date: Date) => {
   return date.toLocaleDateString("pt-BR", {
     day: "2-digit",
@@ -136,11 +129,9 @@ const formatDate = (date: Date) => {
     year: "numeric",
   });
 };
-
 const formatPhone = (phone: string) => {
   return phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
 };
-
 const getDayName = (day: string) => {
   const days = {
     Monday: "Segunda",
@@ -153,23 +144,77 @@ const getDayName = (day: string) => {
   };
   return (days as any)[day] || day;
 };
-
 export default function VeterinarianDetailPage({ params }: { params: any }) {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const veterinarianId = params?.id as string;
+  const [veterinarian, setVeterinarian] = useState<Veterinarian | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [showActions, setShowActions] = useState(false);
 
-  const handleCopyInfo = () => {
-    const info = `
-Veterinário: ${mockVeterinarian.fullName}
-CRMV: ${formatCRMV(mockVeterinarian.crmv)}
-Email: ${mockVeterinarian.email}
-Telefone: ${formatPhone(mockVeterinarian.phoneNumber)}
-Especialidades: ${mockVeterinarian.specialties.join(", ")}
-    `.trim();
+  // Carregar dados do veterinário
+  useEffect(() => {
+    const loadVeterinarian = async () => {
+      if (!isAuthenticated) {
+        router.push('/auth/login');
+        return;
+      }
 
+      try {
+        setLoading(true);
+        const response = await veterinarianAPI.getVeterinarian(veterinarianId);
+        setVeterinarian(response.veterinarian);
+      } catch (error) {
+        console.error('Erro ao carregar veterinário:', error);
+        setError('Erro ao carregar dados do veterinário');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadVeterinarian();
+  }, [isAuthenticated, router, veterinarianId]);
+
+  const handleCopyInfo = () => {
+    if (!veterinarian) return;
+    const info = `
+Veterinário: ${veterinarian.fullName}
+Email: ${veterinarian.email}
+Função: ${veterinarian.role}
+    `.trim();
     navigator.clipboard.writeText(info);
     alert("Informações copiadas!");
   };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span>Carregando dados do veterinário...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !veterinarian) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            Erro ao carregar dados do veterinário
+          </h2>
+          <p className="text-text-secondary mb-4">{error || 'Veterinário não encontrado'}</p>
+          <Button onClick={() => router.back()}>
+            Voltar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto bg-background min-h-screen">
@@ -182,21 +227,18 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
-              {mockVeterinarian.fullName}
+              {veterinarian.fullName}
             </h1>
             <p className="text-text-secondary">
-              CRMV {formatCRMV(mockVeterinarian.crmv)} •{" "}
-              {mockVeterinarian.yearsOfExperience} anos de experiência
+              {veterinarian.role} • Veterinário
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button variant="secondary" onClick={handleCopyInfo}>
             <Copy className="w-4 h-4 mr-2" />
             Copiar Info
           </Button>
-
           <div className="relative">
             <Button
               variant="secondary"
@@ -204,13 +246,9 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
             >
               <MoreVertical className="w-4 h-4" />
             </Button>
-
             {showActions && (
-              <motion.div
+              <div
                 className="absolute right-0 top-full mt-2 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[200px]"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
               >
                 <button className="flex items-center w-full px-3 py-2 text-sm text-text-primary hover:bg-background-secondary">
                   <Eye className="w-4 h-4 mr-2" />
@@ -224,22 +262,18 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Enviar Mensagem
                 </button>
-              </motion.div>
+              </div>
             )}
           </div>
-
           <Button>
             <Edit className="w-4 h-4 mr-2" />
             Editar
           </Button>
         </div>
       </div>
-
       {/* Status Card */}
-      <motion.div
+      <div
         className="bg-success text-text-inverse rounded-lg p-4 mb-6 flex items-center justify-between"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center space-x-3">
           <CheckCircle className="w-6 h-6" />
@@ -249,50 +283,42 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm opacity-75">Próxima consulta</div>
+          <div className="text-sm opacity-75">Status</div>
           <div className="font-medium">
-            Hoje às{" "}
-            {mockVeterinarian.recentAppointments[0]?.date.toLocaleTimeString(
-              "pt-BR",
-              { hour: "2-digit", minute: "2-digit" },
-            )}
+            {veterinarian.isActive ? 'Ativo' : 'Inativo'}
           </div>
         </div>
-      </motion.div>
-
+      </div>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         {[
           {
-            label: "Consultas Totais",
-            value: mockVeterinarian.stats.totalConsultations.toLocaleString(),
+            label: "Agendamentos",
+            value: (veterinarian.stats?.totalAppointments || 0).toLocaleString(),
             icon: FileText,
             color: "primary",
           },
           {
-            label: "Pets Atendidos",
-            value: mockVeterinarian.stats.totalPets.toLocaleString(),
+            label: "Consultas",
+            value: (veterinarian.stats?.totalConsultations || 0).toLocaleString(),
             icon: Users,
             color: "secondary",
           },
           {
-            label: "Avaliação",
-            value: `${mockVeterinarian.stats.averageRating}/5`,
+            label: "Hoje",
+            value: veterinarian.stats?.todayAppointments || 0,
             icon: Star,
             color: "accent",
           },
           {
             label: "Este Mês",
-            value: mockVeterinarian.stats.thisMonthConsultations,
+            value: veterinarian.stats?.thisMonthConsultations || 0,
             icon: TrendingUp,
             color: "success",
           },
         ].map((stat, index) => (
-          <motion.div
+          <div
             key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
           >
             <Card>
               <CardContent className="p-4">
@@ -311,10 +337,9 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         ))}
       </div>
-
       {/* Tabs */}
       <div className="flex space-x-1 mb-6">
         {[
@@ -332,7 +357,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           </Button>
         ))}
       </div>
-
       {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -353,62 +377,56 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                       Nome Completo
                     </label>
                     <p className="text-text-primary">
-                      {mockVeterinarian.fullName}
+                      {veterinarian.fullName}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-text-secondary">
-                      CRMV
+                      Função
                     </label>
                     <p className="text-text-primary">
-                      {formatCRMV(mockVeterinarian.crmv)}
+                      {veterinarian.role}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-text-secondary">
-                      Anos de Experiência
+                      Status
                     </label>
                     <p className="text-text-primary">
-                      {mockVeterinarian.yearsOfExperience} anos
+                      {veterinarian.isActive ? 'Ativo' : 'Inativo'}
                     </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-text-secondary">
-                      Data de Registro
+                      Data de Cadastro
                     </label>
                     <p className="text-text-primary">
-                      {formatDate(mockVeterinarian.created_at)}
+                      {new Date(veterinarian.created_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-text-secondary">
-                    Especialidades
+                    Função
                   </label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {mockVeterinarian.specialties.map((specialty) => (
-                      <span
-                        key={specialty}
-                        className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm"
-                      >
-                        {specialty}
-                      </span>
-                    ))}
+                    <span
+                      className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-sm"
+                    >
+                      {veterinarian.role}
+                    </span>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-text-secondary">
-                    Biografia
+                    Clínica
                   </label>
                   <p className="text-text-primary leading-relaxed mt-1">
-                    {mockVeterinarian.biography}
+                    Clínica Petinova
                   </p>
                 </div>
               </CardContent>
             </Card>
-
             {/* Contact Information */}
             <Card>
               <CardHeader>
@@ -426,18 +444,18 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                         Email
                       </label>
                       <p className="text-text-primary">
-                        {mockVeterinarian.email}
+                        {veterinarian.email}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <Phone className="w-5 h-5 text-text-tertiary" />
+                    <User className="w-5 h-5 text-text-tertiary" />
                     <div>
                       <label className="text-sm font-medium text-text-secondary">
-                        Telefone
+                        Status
                       </label>
                       <p className="text-text-primary">
-                        {formatPhone(mockVeterinarian.phoneNumber)}
+                        {veterinarian.isActive ? 'Ativo' : 'Inativo'}
                       </p>
                     </div>
                   </div>
@@ -445,7 +463,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Quick Actions */}
@@ -474,7 +491,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                 </Button>
               </CardContent>
             </Card>
-
             {/* Recent Appointments */}
             <Card>
               <CardHeader>
@@ -516,7 +532,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           </div>
         </div>
       )}
-
       {/* Schedule Tab */}
       {activeTab === "schedule" && (
         <Card>
@@ -550,7 +565,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           </CardContent>
         </Card>
       )}
-
       {/* Appointments Tab */}
       {activeTab === "appointments" && (
         <Card>
@@ -562,12 +576,9 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
           <CardContent>
             <div className="space-y-4">
               {mockVeterinarian.recentAppointments.map((appointment, index) => (
-                <motion.div
+                <div
                   key={appointment.id}
                   className="flex items-center space-x-4 p-4 bg-background-secondary rounded-lg"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
                 >
                   <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
                     <Calendar className="w-5 h-5 text-primary-600" />
@@ -604,13 +615,12 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
                       ? "Confirmado"
                       : "Agendado"}
                   </span>
-                </motion.div>
+                </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
-
       {/* Profile Tab */}
       {activeTab === "profile" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -640,7 +650,6 @@ Especialidades: ${mockVeterinarian.specialties.join(", ")}
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader>
               <h3 className="text-lg font-semibold text-text-primary">

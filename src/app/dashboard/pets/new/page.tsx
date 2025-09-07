@@ -12,12 +12,35 @@ import { useRouter } from "next/navigation";
 import { petSchema, type PetFormData } from "@/lib/validations/pet";
 import { petAPI } from "@/lib/api/pets";
 import { guardianAPI, type Guardian } from "@/lib/api/guardians";
+import { useAuth } from "@/store";
 
 export default function NewPetPage() {
   const router = useRouter();
+  const { isAuthenticated, user, checkAuth } = useAuth();
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [loadingGuardians, setLoadingGuardians] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Verificar autenticação automaticamente
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkAuth();
+      setAuthChecked(true);
+    };
+    
+    if (!authChecked) {
+      initAuth();
+    }
+  }, [checkAuth, authChecked]);
+
+  // Redirecionar se não autenticado após verificação
+  useEffect(() => {
+    if (authChecked && !isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+  }, [isAuthenticated, router, authChecked]);
 
   const {
     register,
@@ -31,20 +54,23 @@ export default function NewPetPage() {
   });
 
   useEffect(() => {
+    if (!authChecked || !isAuthenticated) return;
+
     const fetchGuardians = async () => {
       try {
+        console.log("Usuário autenticado:", user);
         const response = await guardianAPI.getGuardians({ limit: 100 });
         setGuardians(response.guardians);
       } catch (error) {
         console.error("Error fetching guardians:", error);
-        setSubmitError("Erro ao carregar tutores");
+        setSubmitError("Erro ao carregar tutores. Verifique se você está logado.");
       } finally {
         setLoadingGuardians(false);
       }
     };
 
     fetchGuardians();
-  }, []);
+  }, [authChecked, isAuthenticated, user]);
 
   const onSubmit = async (data: PetFormData) => {
     setSubmitError(null);
@@ -65,7 +91,7 @@ export default function NewPetPage() {
       router.push("/dashboard/pets");
     } catch (error) {
       console.error("Error creating pet:", error);
-      setSubmitError(error instanceof Error ? error.message : "Erro desconhecido");
+      setSubmitError(error instanceof Error ? error.message : "Erro ao cadastrar pet");
     }
   };
 

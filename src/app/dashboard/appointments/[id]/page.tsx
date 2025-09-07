@@ -1,9 +1,6 @@
 "use client";
-
-import React, { useState } from "react";
-import { useParams } from "next/navigation";
-
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Edit,
@@ -23,113 +20,146 @@ import {
   Trash2,
   Copy,
   MessageSquare,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDateTime, formatPhone } from "@/lib/utils";
 import Link from "next/link";
-
-// Mock data - replace with actual data fetching
-const mockAppointment = {
-  appointment_id: "1",
-  dateTime: new Date(2025, 0, 28, 9, 0),
-  status: "confirmed",
-  notes:
-    "Consulta de rotina - Verificação geral de saúde, atualização de vacinas e exame de sangue preventivo.",
-  pet: {
-    pet_id: "1",
-    name: "Buddy",
-    species: "Cão",
-    breed: "Golden Retriever",
-    age: "4 anos",
-    weight: "30kg",
-    color: "Dourado",
-    isNeutered: true,
-    avatarUrl: null,
-  },
-  guardian: {
-    guardian_id: "1",
-    fullName: "João Silva",
-    phone: "11999999999",
-    email: "joao.silva@email.com",
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-  },
-  veterinarian: {
-    veterinarian_id: "1",
-    fullName: "Dra. Maria Santos",
-    specialty: "Clínica Geral",
-    crmv: "12345/SP",
-    phone: "11888888888",
-  },
-  clinic: {
-    clinic_id: "1",
-    tradeName: "Clínica São Bento",
-    address: "Av. Paulista, 456 - Bela Vista, São Paulo - SP",
-    phone: "1133334444",
-  },
-  created_at: new Date(2025, 0, 20),
-  updated_at: new Date(2025, 0, 25),
-};
-
+import { appointmentAPI, type Appointment } from "@/lib/api/appointments";
+import { useAuth } from "@/store";
 const statusConfig = {
-  scheduled: {
+  SCHEDULED: {
     label: "Agendado",
     color: "bg-warning text-warning-foreground",
     icon: Clock,
     description: "Agendamento confirmado, aguardando data",
   },
-  confirmed: {
+  CONFIRMED: {
     label: "Confirmado",
     color: "bg-primary-500 text-text-inverse",
     icon: CheckCircle,
     description: "Cliente confirmou presença",
   },
-  completed: {
+  IN_PROGRESS: {
+    label: "Em Andamento",
+    color: "bg-info text-info-foreground",
+    icon: Clock,
+    description: "Consulta em andamento",
+  },
+  COMPLETED: {
     label: "Concluído",
     color: "bg-success text-success-foreground",
     icon: CheckCircle,
     description: "Consulta realizada com sucesso",
   },
-  cancelled: {
+  CANCELLED: {
     label: "Cancelado",
     color: "bg-error text-error-foreground",
     icon: XCircle,
     description: "Agendamento cancelado",
   },
-  no_show: {
-    label: "Não Compareceu",
-    color: "bg-error text-error-foreground",
-    icon: AlertCircle,
-    description: "Cliente não compareceu na data agendada",
-  },
 };
-
 export default function AppointmentDetailPage() {
   const [activeTab, setActiveTab] = useState<"details" | "history">("details");
   const [showActions, setShowActions] = useState(false);
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const params = useParams();
+  const router = useRouter();
+  const { isAuthenticated, checkAuth } = useAuth();
   const appointmentId = params?.id as string;
-  const statusInfo =
-    statusConfig[mockAppointment.status as keyof typeof statusConfig];
-
-  const handleStatusChange = (newStatus: string) => {
-    console.log(`Changing status to: ${newStatus}`);
-    // Implement status change logic
+  // Verificar autenticação
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkAuth();
+      setAuthChecked(true);
+    };
+    initAuth();
+  }, [checkAuth]);
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (authChecked && !isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+  }, [isAuthenticated, router, authChecked]);
+  // Buscar dados do agendamento
+  useEffect(() => {
+    if (!authChecked || !isAuthenticated || !appointmentId) return;
+    const fetchAppointment = async () => {
+      try {
+        setLoading(true);
+        const response = await appointmentAPI.getAppointment(appointmentId);
+        setAppointment(response.appointment);
+      } catch (error) {
+        console.error("Error fetching appointment:", error);
+        setError("Erro ao carregar dados do agendamento");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAppointment();
+  }, [authChecked, isAuthenticated, appointmentId]);
+  const handleStatusChange = async (newStatus: string) => {
+    if (!appointment) return;
+    try {
+      await appointmentAPI.updateAppointmentStatus(appointment.appointment_id, newStatus as any);
+      // Recarregar dados
+      const response = await appointmentAPI.getAppointment(appointmentId);
+      setAppointment(response.appointment);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      setError("Erro ao atualizar status");
+    }
   };
-
   const handleCopyInfo = () => {
+    if (!appointment) return;
     const info = `
 Agendamento #${appointmentId}
-Pet: ${mockAppointment.pet.name}
-Tutor: ${mockAppointment.guardian.fullName}
-Data: ${formatDateTime(mockAppointment.dateTime)}
-Veterinário: ${mockAppointment.veterinarian.fullName}
+Pet: ${appointment.pet.name}
+Tutor: ${appointment.guardian.fullName}
+Data: ${formatDateTime(appointment.dateTime)}
+Veterinário: ${appointment.veterinarian.fullName}
     `.trim();
-
     navigator.clipboard.writeText(info);
     // Show success toast
   };
-
+  if (!authChecked || loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Carregando agendamento...</span>
+        </div>
+      </div>
+    );
+  }
+  if (error || !appointment) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/appointments" className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
+        <Card className="border-error">
+          <CardContent className="p-6 text-center">
+            <p className="text-error">{error || "Agendamento não encontrado"}</p>
+            <Button className="mt-4" asChild>
+              <Link href="/dashboard/appointments">Voltar para lista</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  const statusInfo = statusConfig[appointment.status as keyof typeof statusConfig];
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -146,17 +176,15 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
               Agendamento #{appointmentId}
             </h1>
             <p className="text-text-secondary">
-              Criado em {formatDateTime(mockAppointment.created_at)}
+              Criado em {formatDateTime(appointment.created_at)}
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button variant="secondary" onClick={handleCopyInfo}>
             <Copy className="w-4 h-4 mr-2" />
             Copiar Info
           </Button>
-
           <div className="relative">
             <Button
               variant="secondary"
@@ -164,13 +192,9 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
             >
               <MoreVertical className="w-4 h-4" />
             </Button>
-
             {showActions && (
-              <motion.div
+              <div
                 className="absolute right-0 top-full mt-2 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[200px]"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
               >
                 <Link
                   href={`/dashboard/appointments/${appointmentId}/edit`}
@@ -179,32 +203,35 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                   <Edit className="w-4 h-4 mr-2" />
                   Editar Agendamento
                 </Link>
-                <button
-                  onClick={() => handleStatusChange("confirmed")}
-                  className="flex items-center w-full px-3 py-2 text-sm text-primary-600 hover:bg-background-secondary"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Marcar como Confirmado
-                </button>
-                <button
-                  onClick={() => handleStatusChange("completed")}
-                  className="flex items-center w-full px-3 py-2 text-sm text-success hover:bg-background-secondary"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Marcar como Concluído
-                </button>
+                                    {appointment.status === "SCHEDULED" && (
+                      <button
+                        onClick={() => handleStatusChange("CONFIRMED")}
+                        className="flex items-center w-full px-3 py-2 text-sm text-primary-600 hover:bg-background-secondary"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Marcar como Confirmado
+                      </button>
+                    )}
+                    {appointment.status === "CONFIRMED" && (
+                      <button
+                        onClick={() => handleStatusChange("COMPLETED")}
+                        className="flex items-center w-full px-3 py-2 text-sm text-success hover:bg-background-secondary"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Marcar como Concluído
+                      </button>
+                    )}
                 <hr className="my-1 border-border" />
                 <button
-                  onClick={() => handleStatusChange("cancelled")}
+                  onClick={() => handleStatusChange("CANCELLED")}
                   className="flex items-center w-full px-3 py-2 text-sm text-error hover:bg-background-secondary"
                 >
                   <XCircle className="w-4 h-4 mr-2" />
                   Cancelar Agendamento
                 </button>
-              </motion.div>
+              </div>
             )}
           </div>
-
           <Button asChild>
             <Link href={`/dashboard/appointments/${appointmentId}/edit`} className="flex items-center">
               <Edit className="w-4 h-4 mr-2" />
@@ -213,12 +240,9 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
           </Button>
         </div>
       </div>
-
       {/* Status Banner */}
-      <motion.div
+      <div
         className={`${statusInfo.color} rounded-lg p-4 mb-6 flex items-center justify-between`}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center space-x-3">
           <statusInfo.icon className="w-6 h-6" />
@@ -230,11 +254,10 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
         <div className="text-right">
           <div className="text-sm opacity-75">Status atualizado em</div>
           <div className="font-medium">
-            {formatDateTime(mockAppointment.updated_at)}
+            {formatDateTime(appointment.updated_at)}
           </div>
         </div>
-      </motion.div>
-
+      </div>
       {/* Tabs */}
       <div className="flex space-x-1 mb-6">
         {[
@@ -250,7 +273,6 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
           </Button>
         ))}
       </div>
-
       {/* Content */}
       {activeTab === "details" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -273,11 +295,10 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     <div className="flex items-center space-x-2 mt-1">
                       <Calendar className="w-4 h-4 text-text-tertiary" />
                       <span className="text-text-primary font-medium">
-                        {formatDateTime(mockAppointment.dateTime)}
+                        {formatDateTime(appointment.dateTime)}
                       </span>
                     </div>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-text-secondary">
                       Status
@@ -290,18 +311,16 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-text-secondary">
                     Observações
                   </label>
                   <div className="mt-1 p-3 bg-background-secondary rounded-md">
-                    <p className="text-text-primary">{mockAppointment.notes}</p>
+                    <p className="text-text-primary">{appointment.notes || 'Nenhuma observação adicional'}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
             {/* Pet Information */}
             <Card>
               <CardHeader>
@@ -317,38 +336,32 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-text-primary mb-2">
-                      {mockAppointment.pet.name}
+                      {appointment.pet.name}
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                       <div>
                         <span className="text-text-secondary">Espécie:</span>
                         <div className="font-medium text-text-primary">
-                          {mockAppointment.pet.species}
+                          {appointment.pet.species}
                         </div>
                       </div>
                       <div>
                         <span className="text-text-secondary">Raça:</span>
                         <div className="font-medium text-text-primary">
-                          {mockAppointment.pet.breed}
+                          {appointment.pet.breed || 'Não informado'}
                         </div>
                       </div>
                       <div>
-                        <span className="text-text-secondary">Idade:</span>
+                        <span className="text-text-secondary">ID:</span>
                         <div className="font-medium text-text-primary">
-                          {mockAppointment.pet.age}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-text-secondary">Peso:</span>
-                        <div className="font-medium text-text-primary">
-                          {mockAppointment.pet.weight}
+                          #{appointment.pet.pet_id}
                         </div>
                       </div>
                     </div>
                   </div>
                   <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/pets/${mockAppointment.pet.pet_id}`} className="flex items-center justify-center"
+                      href={`/dashboard/pets/${appointment.pet.pet_id}`} className="flex items-center justify-center"
                     >
                       Ver Perfil
                     </Link>
@@ -356,7 +369,6 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                 </div>
               </CardContent>
             </Card>
-
             {/* Guardian Information */}
             <Card>
               <CardHeader>
@@ -372,47 +384,50 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-text-primary mb-3">
-                      {mockAppointment.guardian.fullName}
+                      {appointment.guardian.fullName}
                     </h3>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2 text-sm">
                         <Phone className="w-4 h-4 text-text-tertiary" />
                         <span className="text-text-primary">
-                          {formatPhone(mockAppointment.guardian.phone)}
+                          {appointment.guardian.phone ? formatPhone(appointment.guardian.phone) : 'Não informado'}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
                         <Mail className="w-4 h-4 text-text-tertiary" />
                         <span className="text-text-primary">
-                          {mockAppointment.guardian.email}
+                          {appointment.guardian.email}
                         </span>
                       </div>
-                      <div className="flex items-start space-x-2 text-sm">
-                        <MapPin className="w-4 h-4 text-text-tertiary mt-0.5" />
-                        <span className="text-text-primary">
-                          {mockAppointment.guardian.address}
-                        </span>
-                      </div>
+                      {appointment.guardian.address && (
+                        <div className="flex items-start space-x-2 text-sm">
+                          <MapPin className="w-4 h-4 text-text-tertiary mt-0.5" />
+                          <span className="text-text-primary">
+                            {appointment.guardian.address}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col space-y-2">
                     <Button variant="secondary" size="sm" asChild>
                       <Link
-                        href={`/dashboard/guardians/${mockAppointment.guardian.guardian_id}`} className="flex items-center justify-center"
+                        href={`/dashboard/guardians/${appointment.guardian.guardian_id}`} className="flex items-center justify-center"
                       >
                         Ver Perfil
                       </Link>
                     </Button>
-                    <Button variant="secondary" size="sm">
-                      <MessageSquare className="w-4 h-4 mr-1" />
-                      WhatsApp
-                    </Button>
+                    {appointment.guardian.phone && (
+                      <Button variant="secondary" size="sm">
+                        <MessageSquare className="w-4 h-4 mr-1" />
+                        WhatsApp
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Veterinarian Info */}
@@ -429,21 +444,18 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     <Stethoscope className="w-10 h-10 text-accent-600" />
                   </div>
                   <h4 className="font-semibold text-text-primary mb-1">
-                    {mockAppointment.veterinarian.fullName}
+                    {appointment.veterinarian.fullName}
                   </h4>
                   <p className="text-sm text-text-secondary mb-2">
-                    {mockAppointment.veterinarian.specialty}
+                    {appointment.veterinarian.role}
                   </p>
-                  <p className="text-xs text-text-tertiary mb-4">
-                    CRMV {mockAppointment.veterinarian.crmv}
-                  </p>
+
                   <Button variant="secondary" size="sm" className="w-full">
                     Ver Agenda
                   </Button>
                 </div>
               </CardContent>
             </Card>
-
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -458,17 +470,14 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     Iniciar Consulta
                   </Link>
                 </Button>
-
                 <Button variant="secondary" className="w-full">
                   <Calendar className="w-4 h-4 mr-2" />
                   Reagendar
                 </Button>
-
                 <Button variant="secondary" className="w-full">
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Enviar Lembrete
                 </Button>
-
                 <Button
                   variant="ghost"
                   className="w-full text-error hover:bg-error/10"
@@ -478,7 +487,6 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                 </Button>
               </CardContent>
             </Card>
-
             {/* Appointment Info */}
             <Card>
               <CardHeader>
@@ -498,7 +506,7 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Criado em:</span>
                   <span className="text-text-primary">
-                    {formatDateTime(mockAppointment.created_at)}
+                    {formatDateTime(appointment.created_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -506,13 +514,7 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                     Última atualização:
                   </span>
                   <span className="text-text-primary">
-                    {formatDateTime(mockAppointment.updated_at)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-secondary">Clínica:</span>
-                  <span className="text-text-primary">
-                    {mockAppointment.clinic.tradeName}
+                    {formatDateTime(appointment.updated_at)}
                   </span>
                 </div>
               </CardContent>
@@ -520,7 +522,6 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
           </div>
         </div>
       )}
-
       {/* History Tab */}
       {activeTab === "history" && (
         <Card>
@@ -545,12 +546,9 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                   details: "Agendamento realizado pelo portal do cliente",
                 },
               ].map((event, index) => (
-                <motion.div
+                <div
                   key={index}
                   className="flex items-start space-x-4 p-4 bg-background-secondary rounded-lg"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
                 >
                   <div className="w-2 h-2 bg-primary-500 rounded-full mt-2" />
                   <div className="flex-1">
@@ -569,7 +567,7 @@ Veterinário: ${mockAppointment.veterinarian.fullName}
                       por {event.user}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           </CardContent>

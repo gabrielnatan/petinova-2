@@ -1,7 +1,5 @@
 "use client";
-
 import React from "react";
-import { motion } from "framer-motion";
 import {
   Building,
   Users,
@@ -17,7 +15,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useTheme } from "@/components/theme-provider";
-
 const settingsMenuItems = [
   {
     id: "clinic",
@@ -62,14 +59,11 @@ const settingsMenuItems = [
     href: "/dashboard/settings/data",
   },
 ];
-
 function SettingsMenuItem({ item }: { item: any }) {
   return (
-    <motion.a
+    <a
       href={item.href}
       className="block"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
     >
       <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer">
         <CardContent className="p-6">
@@ -91,13 +85,11 @@ function SettingsMenuItem({ item }: { item: any }) {
           </div>
         </CardContent>
       </Card>
-    </motion.a>
+    </a>
   );
 }
-
 function ThemeSelector() {
   const { theme, setTheme } = useTheme();
-
   const themeOptions = [
     {
       value: "light",
@@ -118,7 +110,6 @@ function ThemeSelector() {
       description: "Interface em tons de cinza",
     },
   ];
-
   return (
     <Card>
       <CardHeader>
@@ -131,19 +122,16 @@ function ThemeSelector() {
         <p className="text-sm text-text-secondary">
           Escolha o tema que melhor se adapta ao seu ambiente de trabalho
         </p>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {themeOptions.map((option) => (
-            <motion.button
+            <button
               key={option.value}
               onClick={() => setTheme(option.value as any)}
-              className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+              className={`w-full p-4 border rounded-lg text-left transition-colors duration-200 ${
                 theme === option.value
                   ? "border-primary-500 bg-primary-50"
                   : "border-border hover:border-primary-300"
               }`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
             >
               <div className="flex items-center space-x-3 mb-2">
                 <option.icon
@@ -166,14 +154,13 @@ function ThemeSelector() {
               <p className="text-xs text-text-secondary">
                 {option.description}
               </p>
-            </motion.button>
+            </button>
           ))}
         </div>
       </CardContent>
     </Card>
   );
 }
-
 export default function SettingsPage() {
   return (
     <div className="p-6 space-y-6">
@@ -184,21 +171,16 @@ export default function SettingsPage() {
           Gerencie as configurações do sistema
         </p>
       </div>
-
       {/* Theme Selector */}
       <ThemeSelector />
-
       {/* Settings Menu */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {settingsMenuItems.map((item, index) => (
-          <motion.div
+          <div
             key={item.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
           >
             <SettingsMenuItem item={item} />
-          </motion.div>
+          </div>
         ))}
       </div>
     </div>

@@ -3,18 +3,20 @@
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { Responsive, WidthProvider, Layout } from "react-grid-layout";
-import { useThemeStyles } from "@/components/theme-provider";
-import { useAuth, useDashboard } from "@/store";
+import { useThemeStyles } from "../../components/theme-provider";
+import { useAuth, useDashboard, useConsultations, useProducts } from "../../store";
 
-import { RecentConsultationsWidget } from "@/components/widgets/recent-consultations-widget";
-import { QuickActionsWidget } from "@/components/widgets/quick-actions-widget";
-import { AppointmentsTodayWidget } from "@/components/widgets/appointments-today-widget";
-import { RevenueChartWidget } from "@/components/widgets/revenue-chart-widget";
-import { PetsCountWidget } from "@/components/widgets/pets-count-widget";
-import { StockAlertsWidget } from "@/components/widgets/stock-alerts-widget";
-import { WidgetCustomizationPanel } from "@/components/widgets/widget-customization-panel";
+import {
+  RecentConsultationsWidget,
+  QuickActionsWidget,
+  AppointmentsTodayWidget,
+  RevenueChartWidget,
+  PetsCountWidget,
+  StockAlertsWidget,
+  WidgetCustomizationPanel,
+} from "../../components/widgets";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -38,13 +40,17 @@ function createWidget(type: string, id: string) {
 }
 
 export default function Dashboard() {
-  const { widgets, updateWidget } = useDashboard();
+  const { widgets, updateWidget, loadDashboardLayout, saveDashboardLayout } = useDashboard();
   const { user } = useAuth();
+  const { loadConsultations } = useConsultations();
+  const { loadProducts } = useProducts();
   const styles = useThemeStyles();
 
   const [editMode, setEditMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getLayoutsFromWidgets = () => {
+  const getLayoutsFromWidgets = useCallback(() => {
     const layout = widgets
       .filter((w) => w.visible)
       .map((w) => ({
@@ -64,9 +70,28 @@ export default function Dashboard() {
       xs: layout,
       xxs: layout,
     };
-  };
+  }, [widgets]);
 
-  const [layouts, setLayouts] = useState(getLayoutsFromWidgets());
+  const [layouts, setLayouts] = useState(() => getLayoutsFromWidgets());
+
+  // Carregar layout salvo quando o componente montar
+  useEffect(() => {
+    if (user) {
+      setIsLoading(true);
+      Promise.all([
+        loadDashboardLayout(),
+        loadConsultations(),
+        loadProducts()
+      ]).finally(() => {
+        setIsLoading(false);
+      });
+    }
+  }, [user, loadDashboardLayout, loadConsultations, loadProducts]);
+
+  // Atualizar layouts quando widgets mudarem
+  useEffect(() => {
+    setLayouts(getLayoutsFromWidgets());
+  }, [getLayoutsFromWidgets]);
 
   const handleLayoutChange = (
     _layout: Layout[],
@@ -81,12 +106,33 @@ export default function Dashboard() {
         size: { w: item.w, h: item.h },
       });
     });
+
+    // Salvar automaticamente após uma pequena debounce
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    saveTimeoutRef.current = setTimeout(() => {
+      saveDashboardLayout();
+    }, 1000);
   };
 
   const visibleWidgets = useMemo(
     () => widgets.filter((w) => w.visible),
     [widgets],
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className={`${styles.background} min-h-full flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-text-secondary text-lg">Carregando dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${styles.background} min-h-full p-6`}>
@@ -101,7 +147,13 @@ export default function Dashboard() {
         </div>
 
         <button
-          onClick={() => setEditMode((prev) => !prev)}
+          onClick={() => {
+            if (editMode) {
+              // Salvar imediatamente quando sair do modo de edição
+              saveDashboardLayout();
+            }
+            setEditMode((prev) => !prev);
+          }}
           className="bg-primary-500 text-text-inverse rounded-lg px-4 py-2 hover:bg-primary-600 transition-colors duration-200 font-medium"
         >
           {editMode ? "Concluir Edição" : "Editar Layout"}

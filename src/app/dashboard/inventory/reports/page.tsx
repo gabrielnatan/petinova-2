@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   BarChart3,
@@ -24,7 +22,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
 import { useAuth } from "@/store";
-
 interface ReportData {
   summary: {
     totalProducts: number;
@@ -65,7 +62,6 @@ interface ReportData {
     profit: number;
   }[];
 }
-
 export default function InventoryReportsPage() {
   const { user } = useAuth();
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -77,30 +73,23 @@ export default function InventoryReportsPage() {
   });
   const [selectedReport, setSelectedReport] = useState<string>("inventory");
   const [refreshing, setRefreshing] = useState(false);
-
   const loadReportData = useCallback(async () => {
     if (!user) return;
-    
     try {
       setLoading(true);
       setError(null);
-      
       const params = new URLSearchParams({
         type: selectedReport,
         startDate: dateRange.start.toISOString().split('T')[0],
         endDate: dateRange.end.toISOString().split('T')[0],
         groupBy: 'month'
       });
-      
       const response = await fetch(`/api/reports?${params.toString()}`);
-      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Erro ao carregar relatório');
       }
-      
       const data = await response.json();
-      
       // Transform API data to match our interface
       const transformedData: ReportData = {
         summary: {
@@ -121,7 +110,6 @@ export default function InventoryReportsPage() {
         })),
         monthlyTrends: data.data?.monthlyTrends || []
       };
-      
       setReportData(transformedData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar relatório');
@@ -130,20 +118,16 @@ export default function InventoryReportsPage() {
       setLoading(false);
     }
   }, [user, selectedReport, dateRange]);
-
   useEffect(() => {
     loadReportData();
   }, [loadReportData]);
-
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadReportData();
     setRefreshing(false);
   };
-
   const handleExportPDF = async () => {
     if (!user) return;
-    
     try {
       const params = new URLSearchParams({
         type: selectedReport,
@@ -151,13 +135,10 @@ export default function InventoryReportsPage() {
         endDate: dateRange.end.toISOString().split('T')[0],
         format: 'pdf'
       });
-      
       const response = await fetch(`/api/reports/export?${params.toString()}`);
-      
       if (!response.ok) {
         throw new Error('Erro ao exportar relatório');
       }
-      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -171,11 +152,9 @@ export default function InventoryReportsPage() {
       setError(err instanceof Error ? err.message : 'Erro ao exportar relatório');
     }
   };
-
   const handlePrint = () => {
     window.print();
   };
-
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -196,7 +175,6 @@ export default function InventoryReportsPage() {
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button variant="ghost" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
@@ -212,7 +190,6 @@ export default function InventoryReportsPage() {
           </Button>
         </div>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -270,7 +247,6 @@ export default function InventoryReportsPage() {
           </div>
         </CardContent>
       </Card>
-
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -289,7 +265,6 @@ export default function InventoryReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -304,7 +279,6 @@ export default function InventoryReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -321,7 +295,6 @@ export default function InventoryReportsPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -339,7 +312,6 @@ export default function InventoryReportsPage() {
           </CardContent>
         </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Analysis */}
         <Card>
@@ -351,12 +323,9 @@ export default function InventoryReportsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {(reportData?.categoryAnalysis || []).map((category, index) => (
-              <motion.div
+              <div
                 key={category.category}
                 className="flex items-center justify-between p-3 bg-background-secondary rounded-lg"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <div className="flex items-center space-x-3">
                   <div
@@ -380,11 +349,10 @@ export default function InventoryReportsPage() {
                     {category.percentage}%
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </CardContent>
         </Card>
-
         {/* Top Products */}
         <Card>
           <CardHeader>
@@ -395,12 +363,9 @@ export default function InventoryReportsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {(reportData?.topProducts || []).map((product, index) => (
-              <motion.div
+              <div
                 key={product.name}
                 className="flex items-center justify-between p-3 bg-background-secondary rounded-lg"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <div className="flex items-center space-x-3">
                   <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-xs font-bold text-primary-600">
@@ -423,12 +388,11 @@ export default function InventoryReportsPage() {
                     {product.margin}% margem
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </CardContent>
         </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Low Stock Alerts */}
         <Card>
@@ -440,16 +404,13 @@ export default function InventoryReportsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {(reportData?.lowStockAlert || []).map((item, index) => (
-              <motion.div
+              <div
                 key={item.name}
                 className={`p-3 rounded-lg border-l-4 ${
                   item.status === "critical"
                     ? "bg-error/5 border-l-error"
                     : "bg-warning/5 border-l-warning"
                 }`}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -470,11 +431,10 @@ export default function InventoryReportsPage() {
                     {item.status === "critical" ? "Crítico" : "Baixo"}
                   </span>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </CardContent>
         </Card>
-
         {/* Expiry Alerts */}
         <Card>
           <CardHeader>
@@ -485,12 +445,9 @@ export default function InventoryReportsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {(reportData?.expiryAlert || []).map((item, index) => (
-              <motion.div
+              <div
                 key={item.name}
                 className="p-3 bg-warning/5 border-l-4 border-l-warning rounded-lg"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -505,12 +462,11 @@ export default function InventoryReportsPage() {
                     {item.daysLeft} dias
                   </span>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </CardContent>
         </Card>
       </div>
-
       {/* Monthly Trends */}
       <Card>
         <CardHeader>
@@ -522,12 +478,9 @@ export default function InventoryReportsPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {(reportData?.monthlyTrends || []).map((month, index) => (
-              <motion.div
+              <div
                 key={month.month}
                 className="p-4 bg-background-secondary rounded-lg text-center"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <h4 className="font-semibold text-text-primary mb-3">
                   {month.month}
@@ -552,12 +505,11 @@ export default function InventoryReportsPage() {
                     </p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </CardContent>
       </Card>
-
       {/* Report Summary */}
       <Card>
         <CardHeader>
@@ -581,7 +533,6 @@ export default function InventoryReportsPage() {
                 <li>• Giro de estoque dentro da média</li>
               </ul>
             </div>
-
             <div className="p-4 bg-warning/10 rounded-lg">
               <h4 className="font-semibold text-warning mb-2">
                 Atenção Necessária
@@ -598,7 +549,6 @@ export default function InventoryReportsPage() {
                 <li>• Necessário reposição urgente</li>
               </ul>
             </div>
-
             <div className="p-4 bg-error/10 rounded-lg">
               <h4 className="font-semibold text-error mb-2">Ações Urgentes</h4>
               <ul className="text-sm text-error/80 space-y-1">
@@ -612,7 +562,6 @@ export default function InventoryReportsPage() {
           </div>
         </CardContent>
       </Card>
-      
       {loading && (
         <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
           <div className="bg-surface p-6 rounded-lg shadow-lg flex items-center space-x-3">
@@ -621,7 +570,6 @@ export default function InventoryReportsPage() {
           </div>
         </div>
       )}
-      
       {error && (
         <div className="fixed top-4 right-4 bg-error text-error-foreground p-4 rounded-lg shadow-lg z-50 max-w-md">
           <div className="flex items-center justify-between">

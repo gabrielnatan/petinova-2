@@ -1,8 +1,6 @@
 "use client";
-
 import React, { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Edit,
@@ -21,51 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
-
-interface Pet {
-  pet_id: string;
-  name: string;
-  species: string;
-  breed: string;
-  size: string;
-  weight: number;
-  isNeutered: boolean;
-  environment: string;
-  birthDate: string;
-  deathDate: string | null;
-  notes: string;
-  avatarUrl: string | null;
-  guardian: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-  };
-  consultations: Array<{
-    id: string;
-    date: string;
-    diagnosis: string;
-    treatment: string;
-    notes: string;
-    veterinarian: {
-      id: string;
-      name: string;
-    };
-  }>;
-  appointments: Array<{
-    id: string;
-    date: string;
-    status: string;
-    notes: string;
-    veterinarian: {
-      id: string;
-      name: string;
-    };
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
+import { petAPI, type Pet } from "@/lib/api/pets";
 export default function PetDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const resolvedParams = use(params);
@@ -73,36 +27,19 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
   useEffect(() => {
     const fetchPet = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        const response = await fetch(`/api/pets/${resolvedParams.id}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("Pet não encontrado");
-          }
-          throw new Error("Erro ao carregar pet");
-        }
-
-        const data = await response.json();
-        setPet(data.pet);
+        const response = await petAPI.getPet(resolvedParams.id);
+        setPet(response.pet);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro desconhecido");
+        setError(err instanceof Error ? err.message : "Pet não encontrado");
       } finally {
         setLoading(false);
       }
     };
-
     fetchPet();
   }, [resolvedParams.id]);
-
   const getAgeText = (birthDate: string) => {
     const today = new Date();
     const birth = new Date(birthDate);
@@ -110,42 +47,27 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const years = Math.floor(diffDays / 365);
     const months = Math.floor((diffDays % 365) / 30);
-
     if (years > 0) {
       return `${years} ano${years > 1 ? "s" : ""}`;
     } else {
       return `${months} mes${months > 1 ? "es" : ""}`;
     }
   };
-
   const handleDelete = async () => {
     if (!confirm("Tem certeza que deseja excluir este pet? Esta ação não pode ser desfeita.")) {
       return;
     }
-
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(`/api/pets/${resolvedParams.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        router.push("/dashboard/pets");
-      } else {
-        alert("Erro ao excluir pet");
-      }
+      await petAPI.deletePet(resolvedParams.id);
+      router.push("/dashboard/pets");
     } catch (error) {
       console.error("Erro ao excluir pet:", error);
-      alert("Erro ao excluir pet");
+      setError(error instanceof Error ? error.message : "Erro ao excluir pet");
     } finally {
       setIsDeleting(false);
     }
   };
-
   if (loading) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
@@ -155,7 +77,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
-
   if (error || !pet) {
     return (
       <div className="p-6 max-w-6xl mx-auto">
@@ -176,13 +97,9 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
-
   return (
-    <motion.div
+    <div
       className="p-6 max-w-6xl mx-auto"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -200,7 +117,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
             </p>
           </div>
         </div>
-
         <div className="flex space-x-2">
           <Button variant="secondary" asChild>
             <Link href={`/dashboard/pets/${pet.pet_id}/edit`} className="flex items-center gap-2">
@@ -227,7 +143,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
           </Button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pet Information */}
         <div className="lg:col-span-2 space-y-6">
@@ -247,7 +162,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     <p className="font-medium text-text-primary">{pet.species}</p>
                   </div>
                 </div>
-
                 <div className="flex items-center space-x-3">
                   <Ruler className="w-5 h-5 text-text-secondary" />
                   <div>
@@ -257,7 +171,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     </p>
                   </div>
                 </div>
-
                 <div className="flex items-center space-x-3">
                   <Scale className="w-5 h-5 text-text-secondary" />
                   <div>
@@ -267,7 +180,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     </p>
                   </div>
                 </div>
-
                 {pet.birthDate && (
                   <div className="flex items-center space-x-3">
                     <Calendar className="w-5 h-5 text-text-secondary" />
@@ -279,7 +191,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                 )}
-
                 <div className="flex items-center space-x-3">
                   <Home className="w-5 h-5 text-text-secondary" />
                   <div>
@@ -289,7 +200,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     </p>
                   </div>
                 </div>
-
                 <div className="flex items-center space-x-3">
                   <Heart className="w-5 h-5 text-text-secondary" />
                   <div>
@@ -304,7 +214,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </div>
               </div>
-
               {pet.notes && (
                 <div className="mt-6 pt-4 border-t border-border">
                   <div className="flex items-start space-x-3">
@@ -318,7 +227,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
               )}
             </CardContent>
           </Card>
-
           {/* Medical History */}
           <Card>
             <CardHeader>
@@ -363,7 +271,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
             </CardContent>
           </Card>
         </div>
-
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Guardian Info */}
@@ -379,12 +286,11 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                   <User className="w-5 h-5 text-text-secondary" />
                   <div>
                     <p className="font-medium text-text-primary">
-                      {pet.guardian.name}
+                      {pet.guardian?.fullName || 'Tutor não encontrado'}
                     </p>
                   </div>
                 </div>
-
-                {pet.guardian.email && (
+                {pet.guardian?.email && (
                   <div className="flex items-center space-x-3">
                     <Mail className="w-5 h-5 text-text-secondary" />
                     <div>
@@ -394,8 +300,7 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                 )}
-
-                {pet.guardian.phone && (
+                {pet.guardian?.phone && (
                   <div className="flex items-center space-x-3">
                     <Phone className="w-5 h-5 text-text-secondary" />
                     <div>
@@ -408,7 +313,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
               </div>
             </CardContent>
           </Card>
-
           {/* Quick Actions */}
           <Card>
             <CardHeader>
@@ -433,7 +337,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
               </div>
             </CardContent>
           </Card>
-
           {/* Recent Appointments */}
           <Card>
             <CardHeader>
@@ -476,6 +379,6 @@ export default function PetDetailsPage({ params }: { params: Promise<{ id: strin
           </Card>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

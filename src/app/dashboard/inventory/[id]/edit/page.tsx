@@ -1,7 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -26,8 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-
+import { useParams, useRouter } from "next/navigation";
+import { productAPI, type Product } from "@/lib/api/products";
 // Schema de validação
 const editProductSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -44,57 +42,8 @@ const editProductSchema = z.object({
   location: z.string().optional(),
   batch: z.string().optional(),
 });
-
 type EditProductFormData = z.infer<typeof editProductSchema>;
-
-// Mock data - replace with actual data fetching
-const mockProduct = {
-  product_id: "1",
-  name: "Ração Premium Cães Adultos",
-  type: "Alimento",
-  unit: "kg",
-  quantity: 45,
-  minStock: 20,
-  costPrice: 45.5,
-  salePrice: 89.9,
-  validity: new Date("2025-08-15"),
-  supplier: "PetFood Distribuidora",
-  barcode: "7891234567890",
-  description:
-    "Ração premium completa e balanceada para cães adultos de porte grande. Rica em proteínas e nutrientes essenciais.",
-  location: "Prateleira A2",
-  batch: "L2024001",
-  created_at: new Date("2024-03-10"),
-  updated_at: new Date("2024-12-20"),
-
-  movements: [
-    {
-      id: "1",
-      type: "IN",
-      quantity: 50,
-      date: new Date("2025-01-25"),
-      reason: "Compra - Fornecedor",
-      user: "Admin Sistema",
-    },
-    {
-      id: "2",
-      type: "OUT",
-      quantity: 5,
-      date: new Date("2025-01-20"),
-      reason: "Venda Balcão",
-      user: "Recepção",
-    },
-  ],
-
-  stats: {
-    totalSold: 156,
-    totalRevenue: 14040.4,
-    averageMonthlyConsumption: 12.5,
-    daysUntilExpiry: 198,
-    stockDays: Math.floor(45 / (12.5 / 30)), // quantity / (monthly consumption / 30)
-  },
-};
-
+// Product types and units
 const productTypes = [
   "Medicamento",
   "Alimento",
@@ -105,7 +54,6 @@ const productTypes = [
   "Material Cirúrgico",
   "Vacina",
 ];
-
 const units = [
   "un",
   "kg",
@@ -120,12 +68,16 @@ const units = [
   "caixa",
   "pacote",
 ];
-
 export default function EditProductPage() {
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [suggestedMargin, setSuggestedMargin] = useState<number>(50);
   const params = useParams();
-  const appointmentId = params?.id as string;
+  const router = useRouter();
+  const productId = params?.id as string;
+  
   const {
     register,
     handleSubmit,
@@ -134,34 +86,52 @@ export default function EditProductPage() {
     formState: { errors, isSubmitting, isDirty },
   } = useForm<EditProductFormData>({
     resolver: zodResolver(editProductSchema),
-    defaultValues: {
-      name: mockProduct.name,
-      type: mockProduct.type,
-      unit: mockProduct.unit,
-      quantity: mockProduct.quantity,
-      minStock: mockProduct.minStock,
-      costPrice: mockProduct.costPrice,
-      salePrice: mockProduct.salePrice,
-      validity: mockProduct.validity,
-      supplier: mockProduct.supplier,
-      barcode: mockProduct.barcode,
-      description: mockProduct.description,
-      location: mockProduct.location,
-      batch: mockProduct.batch,
-    },
   });
 
+  // Load product data
+  useEffect(() => {
+    const loadProduct = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await productAPI.getProduct(productId);
+        const productData = response.product;
+        setProduct(productData);
+        
+        // Set form values
+        setValue("name", productData.name);
+        setValue("type", productData.category);
+        setValue("unit", productData.inventory.unit);
+        setValue("quantity", productData.inventory.stock);
+        setValue("minStock", productData.inventory.minimumStock);
+        setValue("costPrice", productData.prices.purchase);
+        setValue("salePrice", productData.prices.sale);
+        setValue("validity", productData.details.expirationDate ? new Date(productData.details.expirationDate) : null);
+        setValue("supplier", productData.supplier || "");
+        setValue("barcode", productData.barcode || "");
+        setValue("description", productData.description || "");
+        setValue("location", productData.inventory.location || "");
+        setValue("batch", productData.details.batchNumber || "");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro ao carregar produto');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (productId) {
+      loadProduct();
+    }
+  }, [productId, setValue]);
   const watchCostPrice = watch("costPrice");
   const watchSalePrice = watch("salePrice");
   const watchQuantity = watch("quantity");
   const watchMinStock = watch("minStock");
-
   // Calcular margem de lucro
   const margin =
     watchCostPrice && watchSalePrice
       ? ((watchSalePrice - watchCostPrice) / watchCostPrice) * 100
       : 0;
-
   // Status do estoque
   const getStockStatus = () => {
     if (watchQuantity <= watchMinStock) {
@@ -187,42 +157,41 @@ export default function EditProductPage() {
       label: "Estoque OK",
     };
   };
-
   const onSubmit = async (data: EditProductFormData) => {
     try {
-      console.log("Updating product:", { id: appointmentId, ...data });
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Redirect to inventory
-      window.location.href = "/dashboard/inventory";
+      if (!product) return;
+      
+      const updateData = {
+        name: data.name,
+        description: data.description,
+        supplier: data.supplier,
+        purchasePrice: data.costPrice,
+        stock: data.quantity,
+        expirationDate: data.validity?.toISOString(),
+        notes: data.description,
+      };
+      
+      await productAPI.updateProduct(productId, updateData);
+      router.push("/dashboard/inventory");
     } catch (error) {
       console.error("Error updating product:", error);
     }
   };
-
+  
   const handleDelete = async () => {
     try {
-      console.log("Deleting product:", appointmentId);
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Redirect to inventory
-      window.location.href = "/dashboard/inventory";
+      await productAPI.deleteProduct(productId);
+      router.push("/dashboard/inventory");
     } catch (error) {
       console.error("Error deleting product:", error);
     }
   };
-
   const calculateSuggestedPrice = () => {
     if (watchCostPrice) {
       const suggestedPrice = watchCostPrice * (1 + suggestedMargin / 100);
       setValue("salePrice", Number(suggestedPrice.toFixed(2)));
     }
   };
-
   const applyMarginPreset = (marginPercent: number) => {
     setSuggestedMargin(marginPercent);
     if (watchCostPrice) {
@@ -230,8 +199,89 @@ export default function EditProductPage() {
       setValue("salePrice", Number(suggestedPrice.toFixed(2)));
     }
   };
-
   const stockStatus = getStockStatus();
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-text-secondary">Carregando produto...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
+        <Card className="border-error">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 text-error">
+              <AlertTriangle className="w-5 h-5" />
+              <p>{error}</p>
+            </div>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="mt-3"
+              onClick={() => window.location.reload()}
+            >
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Product not found
+  if (!product) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/inventory" className="flex items-center">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <Package className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-text-primary mb-2">
+            Produto não encontrado
+          </h3>
+          <p className="text-text-secondary mb-4">
+            O produto que você está procurando não existe ou foi removido.
+          </p>
+          <Button asChild>
+            <Link href="/dashboard/inventory">
+              Voltar ao Estoque
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -249,12 +299,11 @@ export default function EditProductPage() {
               Editar Produto
             </h1>
             <p className="text-text-secondary">
-              {mockProduct.name} • Última atualização:{" "}
-              {formatDate(mockProduct.updated_at)}
+              {product.name} • Última atualização:{" "}
+              {formatDate(product.updated_at)}
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button
             variant="ghost"
@@ -266,7 +315,6 @@ export default function EditProductPage() {
           </Button>
         </div>
       </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form */}
@@ -287,7 +335,6 @@ export default function EditProductPage() {
                   placeholder="Ex: Ração Premium Cães Adultos"
                   icon={Package}
                 />
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">
@@ -309,7 +356,6 @@ export default function EditProductPage() {
                       </p>
                     )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">
                       Unidade de Medida
@@ -331,7 +377,6 @@ export default function EditProductPage() {
                     )}
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-2">
                     Descrição
@@ -345,7 +390,6 @@ export default function EditProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Stock Information */}
             <Card>
               <CardHeader>
@@ -364,7 +408,6 @@ export default function EditProductPage() {
                     placeholder="0"
                     min="0"
                   />
-
                   <Input
                     label="Estoque Mínimo"
                     type="number"
@@ -374,11 +417,8 @@ export default function EditProductPage() {
                     min="1"
                   />
                 </div>
-
                 {/* Stock Status Alert */}
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                <div
                   className={`p-4 rounded-lg ${stockStatus.bg} border ${
                     stockStatus.status === "low"
                       ? "border-error/20"
@@ -399,17 +439,15 @@ export default function EditProductPage() {
                     {stockStatus.status === "medium" &&
                       "Estoque próximo do mínimo. Considere fazer reposição em breve."}
                     {stockStatus.status === "good" &&
-                      `Estoque adequado. Durará aproximadamente ${mockProduct.stats.stockDays} dias.`}
+                      `Estoque adequado.`}
                   </p>
-                </motion.div>
-
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="Localização no Estoque"
                     {...register("location")}
                     placeholder="Ex: Prateleira A2, Geladeira 1"
                   />
-
                   <Input
                     label="Código de Barras"
                     {...register("barcode")}
@@ -417,14 +455,12 @@ export default function EditProductPage() {
                     icon={Barcode}
                   />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="Lote"
                     {...register("batch")}
                     placeholder="Ex: L2024001"
                   />
-
                   <Input
                     label="Data de Validade"
                     type="date"
@@ -435,7 +471,6 @@ export default function EditProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Financial Information */}
             <Card>
               <CardHeader>
@@ -455,7 +490,6 @@ export default function EditProductPage() {
                     placeholder="0,00"
                     icon={DollarSign}
                   />
-
                   <div>
                     <Input
                       label="Preço de Venda"
@@ -494,11 +528,8 @@ export default function EditProductPage() {
                     </div>
                   </div>
                 </div>
-
                 {watchCostPrice > 0 && watchSalePrice > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div
                     className={`p-4 rounded-lg ${
                       margin >= 30
                         ? "bg-success/10 border border-success/20"
@@ -535,9 +566,8 @@ export default function EditProductPage() {
                         }`}
                       />
                     </div>
-                  </motion.div>
+                  </div>
                 )}
-
                 <Input
                   label="Fornecedor"
                   {...register("supplier")}
@@ -548,7 +578,6 @@ export default function EditProductPage() {
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Actions */}
@@ -568,22 +597,18 @@ export default function EditProductPage() {
                   <Save className="w-4 h-4 mr-2" />
                   {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
-
                 <Button variant="secondary" className="w-full" asChild>
                   <Link href="/dashboard/inventory" className="flex items-center justify-center">Cancelar Edição</Link>
                 </Button>
-
                 <hr className="border-border" />
-
                 <Button variant="secondary" className="w-full" asChild>
-                  <Link href={`/dashboard/inventory/${appointmentId}`} className="flex items-center justify-center">
+                  <Link href={`/dashboard/inventory/${productId}`} className="flex items-center justify-center">
                     <Eye className="w-4 h-4 mr-2" />
                     Ver Detalhes
                   </Link>
                 </Button>
               </CardContent>
             </Card>
-
             {/* Product Statistics */}
             <Card>
               <CardHeader>
@@ -594,17 +619,16 @@ export default function EditProductPage() {
               <CardContent className="space-y-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary-500 mb-1">
-                    {mockProduct.stats.totalSold}
+                    {product.stats.totalSales || 0}
                   </div>
                   <div className="text-sm text-text-secondary">
                     Unidades Vendidas
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div>
                     <div className="text-lg font-bold text-success">
-                      {formatCurrency(mockProduct.stats.totalRevenue)}
+                      {formatCurrency((product.stats.totalSales || 0) * product.prices.sale)}
                     </div>
                     <div className="text-xs text-text-secondary">
                       Receita Total
@@ -612,25 +636,24 @@ export default function EditProductPage() {
                   </div>
                   <div>
                     <div className="text-lg font-bold text-text-primary">
-                      {mockProduct.stats.averageMonthlyConsumption}
+                      {product.stats.averageMonthlyUsage || 0}
                     </div>
                     <div className="text-xs text-text-secondary">
                       Consumo/Mês
                     </div>
                   </div>
                 </div>
-
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Criado em:</span>
                     <span className="text-text-primary">
-                      {formatDate(mockProduct.created_at)}
+                      {formatDate(product.created_at)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Validade:</span>
                     <span className="text-text-primary">
-                      {formatDate(mockProduct.validity)}
+                      {product.details.expirationDate ? formatDate(product.details.expirationDate) : 'Não definida'}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -638,7 +661,9 @@ export default function EditProductPage() {
                       Dias para vencer:
                     </span>
                     <span className="text-text-primary">
-                      {mockProduct.stats.daysUntilExpiry} dias
+                      {product.details.expirationDate ? 
+                        Math.max(0, Math.ceil((new Date(product.details.expirationDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 
+                        'N/A'} dias
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -646,13 +671,14 @@ export default function EditProductPage() {
                       Duração estimada:
                     </span>
                     <span className="text-text-primary">
-                      {mockProduct.stats.stockDays} dias
+                      {product.stats.averageMonthlyUsage ? 
+                        Math.floor(product.inventory.stock / (product.stats.averageMonthlyUsage / 30)) : 
+                        'N/A'} dias
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
             {/* Recent Movements */}
             <Card>
               <CardHeader>
@@ -662,50 +688,13 @@ export default function EditProductPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {mockProduct.movements.map((movement, index) => (
-                    <motion.div
-                      key={movement.id}
-                      className="flex items-center justify-between p-3 bg-background-secondary rounded-lg"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            movement.type === "IN"
-                              ? "bg-success/10"
-                              : "bg-error/10"
-                          }`}
-                        >
-                          {movement.type === "IN" ? (
-                            <TrendingUp className="w-4 h-4 text-success" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-error" />
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-text-primary">
-                            {movement.type === "IN" ? "+" : "-"}
-                            {movement.quantity}
-                          </h4>
-                          <p className="text-sm text-text-secondary">
-                            {movement.reason}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-text-primary">
-                          {formatDate(movement.date)}
-                        </div>
-                        <div className="text-xs text-text-tertiary">
-                          {movement.user}
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                  <div className="text-center py-8">
+                    <BarChart3 className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
+                    <p className="text-text-secondary">
+                      Movimentações não implementadas ainda
+                    </p>
+                  </div>
                 </div>
-
                 <Button variant="ghost" className="w-full mt-3" asChild>
                   <Link href="/dashboard/inventory/movements" className="flex items-center justify-center">
                     <BarChart3 className="w-4 h-4 mr-2" />
@@ -714,7 +703,6 @@ export default function EditProductPage() {
                 </Button>
               </CardContent>
             </Card>
-
             {/* Pricing Calculator */}
             <Card>
               <CardHeader>
@@ -736,7 +724,6 @@ export default function EditProductPage() {
                     max="500"
                   />
                 </div>
-
                 <Button
                   type="button"
                   variant="secondary"
@@ -747,7 +734,6 @@ export default function EditProductPage() {
                   <Calculator className="w-4 h-4 mr-2" />
                   Calcular Preço
                 </Button>
-
                 {watchCostPrice > 0 && (
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
@@ -770,7 +756,6 @@ export default function EditProductPage() {
                 )}
               </CardContent>
             </Card>
-
             {/* Warning Card */}
             <Card className="border-warning/20 bg-warning/5">
               <CardHeader>
@@ -784,18 +769,16 @@ export default function EditProductPage() {
                   Este produto possui movimentações no estoque. Alterações nos
                   preços afetarão apenas vendas futuras.
                 </p>
-
                 <div className="space-y-2">
                   <p className="text-xs text-warning/60">
-                    • {mockProduct.movements.length} movimentações registradas
-                    <br />• {mockProduct.stats.totalSold} unidades já vendidas
+                    • Movimentações não implementadas ainda
+                    <br />• {product.stats.totalSales || 0} unidades já vendidas
                     <br />• Receita total:{" "}
-                    {formatCurrency(mockProduct.stats.totalRevenue)}
+                    {formatCurrency((product.stats.totalSales || 0) * product.prices.sale)}
                   </p>
                 </div>
               </CardContent>
             </Card>
-
             {/* Information */}
             <Card>
               <CardHeader>
@@ -807,13 +790,13 @@ export default function EditProductPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">ID do Produto:</span>
                   <span className="text-text-primary font-medium">
-                    #{appointmentId}
+                    #{productId}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Cadastrado em:</span>
                   <span className="text-text-primary">
-                    {formatDate(mockProduct.created_at)}
+                    {formatDate(product.created_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -821,7 +804,7 @@ export default function EditProductPage() {
                     Última atualização:
                   </span>
                   <span className="text-text-primary">
-                    {formatDate(mockProduct.updated_at)}
+                    {formatDate(product.updated_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -835,18 +818,13 @@ export default function EditProductPage() {
           </div>
         </div>
       </form>
-
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+        <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowDeleteConfirm(false)}
         >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+          <div
             className="bg-surface rounded-lg p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
@@ -863,12 +841,10 @@ export default function EditProductPage() {
                 </p>
               </div>
             </div>
-
             <div className="mb-6">
               <p className="text-text-secondary mb-4">
                 Tem certeza que deseja excluir permanentemente este produto?
               </p>
-
               <div className="bg-error/10 border border-error/20 rounded-lg p-4">
                 <h4 className="font-medium text-error mb-2">
                   ⚠️ Consequências da exclusão:
@@ -876,20 +852,16 @@ export default function EditProductPage() {
                 <ul className="text-sm text-error/80 space-y-1">
                   <li>• Produto será removido do estoque</li>
                   <li>
-                    • {mockProduct.movements.length} movimentação
-                    {mockProduct.movements.length !== 1 ? "ões" : ""} será
-                    {mockProduct.movements.length !== 1 ? "ão" : ""} mantida
-                    {mockProduct.movements.length !== 1 ? "s" : ""} no histórico
+                    • Movimentações não implementadas ainda
                   </li>
                   <li>• Histórico de vendas será preservado</li>
                   <li>
                     • Receita total:{" "}
-                    {formatCurrency(mockProduct.stats.totalRevenue)}
+                    {formatCurrency((product.stats.totalSales || 0) * product.prices.sale)}
                   </li>
                 </ul>
               </div>
             </div>
-
             <div className="flex justify-end space-x-3">
               <Button
                 variant="secondary"
@@ -906,8 +878,8 @@ export default function EditProductPage() {
                 Excluir Permanentemente
               </Button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

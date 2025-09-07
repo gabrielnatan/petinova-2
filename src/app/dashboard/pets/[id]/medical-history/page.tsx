@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Heart,
@@ -29,20 +28,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDateTime, formatDate } from "@/lib/utils";
-import { useParams } from "next/navigation";
-
-// Mock data - replace with actual data fetching
-const mockPet = {
-  pet_id: "1",
-  name: "Buddy",
-  species: "Canina",
-  breed: "Golden Retriever",
-  birthDate: new Date("2021-03-15"),
-  guardian: {
-    fullName: "João Silva",
-  },
-};
-
+import { useParams, useRouter } from "next/navigation";
+import { petAPI, type Pet } from "@/lib/api/pets";
+import { useAuth } from "@/store";
 const mockMedicalHistory = {
   consultations: [
     {
@@ -154,7 +142,6 @@ const mockMedicalHistory = {
       files: ["cartao_vacina_20240815.pdf"],
     },
   ],
-
   vaccinations: [
     {
       id: "1",
@@ -187,7 +174,6 @@ const mockMedicalHistory = {
       status: "current",
     },
   ],
-
   procedures: [
     {
       id: "1",
@@ -207,7 +193,6 @@ const mockMedicalHistory = {
       status: "completed",
     },
   ],
-
   conditions: [
     {
       id: "1",
@@ -228,7 +213,6 @@ const mockMedicalHistory = {
       severity: "mild",
     },
   ],
-
   allergies: [
     {
       id: "1",
@@ -239,77 +223,146 @@ const mockMedicalHistory = {
     },
   ],
 };
-
 export default function PetMedicalHistoryPage() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const [pet, setPet] = useState<Pet | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPeriod, setFilterPeriod] = useState<string>("all");
   const [expandedConsultation, setExpandedConsultation] = useState<
     string | null
   >(null);
+  
   const params = useParams();
-  const appointmentId = params?.id as string;
+  const petId = params?.id as string;
+
+  // Carregar dados do pet
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const loadPet = async () => {
+      try {
+        setLoading(true);
+        const response = await petAPI.getPet(petId);
+        setPet(response.pet);
+      } catch (error) {
+        console.error('Error loading pet:', error);
+        setError(error instanceof Error ? error.message : 'Erro ao carregar pet');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPet();
+  }, [petId, isAuthenticated]);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, router]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span>Carregando histórico médico...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            Erro ao carregar histórico médico
+          </h2>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found state
+  if (!pet) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            Pet não encontrado
+          </h2>
+          <p className="text-text-secondary mb-4">
+            O pet que você está procurando não existe.
+          </p>
+          <Button asChild>
+            <Link href="/dashboard/pets">
+              Voltar para Pets
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const calculateAge = (birthDate: Date) => {
     const now = new Date();
     const years = now.getFullYear() - birthDate.getFullYear();
     const months = now.getMonth() - birthDate.getMonth();
-
     if (months < 0 || (months === 0 && now.getDate() < birthDate.getDate())) {
       return { years: years - 1, months: months + 12 };
     }
-
     return { years, months };
   };
-
-  const age = calculateAge(mockPet.birthDate);
-  const ageString = `${age.years} ano${age.years !== 1 ? "s" : ""}${age.months > 0 ? ` e ${age.months} mes${age.months !== 1 ? "es" : ""}` : ""}`;
-
-  // Filtrar consultas
-  const filteredConsultations = mockMedicalHistory.consultations.filter(
+  const age = pet.birthDate ? calculateAge(new Date(pet.birthDate)) : { years: 0, months: 0 };
+  const ageString = pet.birthDate ? `${age.years} ano${age.years !== 1 ? "s" : ""}${age.months > 0 ? ` e ${age.months} mes${age.months !== 1 ? "es" : ""}` : ""}` : "Idade não informada";
+  
+  // Filtrar consultas (usar dados reais do pet)
+  const filteredConsultations = (pet.consultations || []).filter(
     (consultation) => {
       const matchesSearch =
         searchTerm === "" ||
-        consultation.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        consultation.veterinarian
+        consultation.diagnosis?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        consultation.veterinarian.name
           .toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
-        consultation.description
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase());
-
+        consultation.treatment?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType =
         filterType === "all" ||
-        (filterType === "consultation" &&
-          consultation.type.includes("Consulta")) ||
-        (filterType === "surgery" && consultation.type.includes("Cirurgia")) ||
-        (filterType === "vaccination" &&
-          consultation.type.includes("Vacinação")) ||
-        (filterType === "emergency" &&
-          consultation.type.includes("Emergência"));
-
+        (filterType === "consultation" && consultation.diagnosis) ||
+        (filterType === "surgery" && consultation.treatment?.includes("cirurgia")) ||
+        (filterType === "vaccination" && consultation.treatment?.includes("vacina")) ||
+        (filterType === "emergency" && consultation.diagnosis?.includes("emergência"));
       let matchesPeriod = true;
       if (filterPeriod === "last_month") {
         const lastMonth = new Date();
         lastMonth.setMonth(lastMonth.getMonth() - 1);
-        matchesPeriod = consultation.date >= lastMonth;
+        matchesPeriod = new Date(consultation.date) >= lastMonth;
       } else if (filterPeriod === "last_year") {
         const lastYear = new Date();
         lastYear.setFullYear(lastYear.getFullYear() - 1);
-        matchesPeriod = consultation.date >= lastYear;
+        matchesPeriod = new Date(consultation.date) >= lastYear;
       }
-
       return matchesSearch && matchesType && matchesPeriod;
     },
   );
-
   const handleExportPDF = () => {
     console.log("Exporting medical history to PDF...");
   };
-
   const handlePrint = () => {
     window.print();
   };
-
   const getConditionSeverityColor = (severity: string) => {
     switch (severity) {
       case "mild":
@@ -322,7 +375,6 @@ export default function PetMedicalHistoryPage() {
         return "text-text-secondary bg-background-secondary";
     }
   };
-
   const getAllergySeverityColor = (severity: string) => {
     switch (severity) {
       case "mild":
@@ -335,16 +387,15 @@ export default function PetMedicalHistoryPage() {
         return "text-text-secondary bg-background-secondary";
     }
   };
-
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" asChild>
-            <Link href={`/dashboard/pets/${appointmentId}`} className="flex items-center gap-2">
+            <Link href={`/dashboard/pets/${petId}`} className="flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" />
-              Voltar para {mockPet.name}
+              Voltar para {pet.name}
             </Link>
           </Button>
           <div>
@@ -352,12 +403,11 @@ export default function PetMedicalHistoryPage() {
               Histórico Médico Completo
             </h1>
             <p className="text-text-secondary">
-              {mockPet.name} • {mockPet.breed} • {ageString} • Tutor:{" "}
-              {mockPet.guardian.fullName}
+              {pet.name} • {pet.breed || 'Raça não informada'} • {ageString} • Tutor:{" "}
+              {pet.guardian?.fullName || 'Tutor não informado'}
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button variant="secondary" onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-2" />
@@ -375,7 +425,6 @@ export default function PetMedicalHistoryPage() {
           </Button>
         </div>
       </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="p-4">
@@ -388,7 +437,6 @@ export default function PetMedicalHistoryPage() {
                 icon={Search}
               />
             </div>
-
             <div>
               <select
                 value={filterType}
@@ -402,7 +450,6 @@ export default function PetMedicalHistoryPage() {
                 <option value="emergency">Emergências</option>
               </select>
             </div>
-
             <div>
               <select
                 value={filterPeriod}
@@ -414,7 +461,6 @@ export default function PetMedicalHistoryPage() {
                 <option value="last_year">Último ano</option>
               </select>
             </div>
-
             <div className="flex items-center space-x-2">
               <Button variant="secondary" className="flex-1">
                 <Filter className="w-4 h-4 mr-2" />
@@ -424,7 +470,6 @@ export default function PetMedicalHistoryPage() {
           </div>
         </CardContent>
       </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Timeline */}
         <div className="lg:col-span-3 space-y-6">
@@ -446,40 +491,35 @@ export default function PetMedicalHistoryPage() {
             <CardContent>
               <div className="space-y-6">
                 {filteredConsultations.map((consultation, index) => (
-                  <motion.div
-                    key={consultation.consultation_id}
+                  <div
+                    key={consultation.id}
                     className="relative"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
                   >
                     {/* Timeline Line */}
                     {index < filteredConsultations.length - 1 && (
                       <div className="absolute left-6 top-16 w-0.5 h-20 bg-border" />
                     )}
-
                     <div className="flex items-start space-x-4">
                       {/* Timeline Dot */}
                       <div
-                        className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          consultation.type.includes("Cirurgia")
+                                                className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          consultation.treatment?.includes("cirurgia")
                             ? "bg-warning/10 text-warning"
-                            : consultation.type.includes("Vacinação")
+                            : consultation.treatment?.includes("vacina")
                               ? "bg-success/10 text-success"
-                              : consultation.type.includes("Emergência")
-                                ? "bg-error/10 text-error"
-                                : "bg-primary/10 text-primary-600"
+                            : consultation.diagnosis?.includes("emergência")
+                              ? "bg-error/10 text-error"
+                              : "bg-primary/10 text-primary-600"
                         }`}
                       >
-                        {consultation.type.includes("Cirurgia") ? (
+                        {consultation.treatment?.includes("cirurgia") ? (
                           <Pill className="w-6 h-6" />
-                        ) : consultation.type.includes("Vacinação") ? (
+                        ) : consultation.treatment?.includes("vacina") ? (
                           <Syringe className="w-6 h-6" />
                         ) : (
                           <Stethoscope className="w-6 h-6" />
                         )}
                       </div>
-
                       {/* Content */}
                       <div className="flex-1">
                         <Card className="hover:shadow-md transition-shadow">
@@ -487,7 +527,7 @@ export default function PetMedicalHistoryPage() {
                             <div className="flex items-start justify-between mb-3">
                               <div>
                                 <h4 className="font-semibold text-text-primary text-lg">
-                                  {consultation.type}
+                                  {consultation.diagnosis || 'Consulta'}
                                 </h4>
                                 <div className="flex items-center space-x-4 text-sm text-text-secondary mt-1">
                                   <span className="flex items-center">
@@ -496,46 +536,43 @@ export default function PetMedicalHistoryPage() {
                                   </span>
                                   <span className="flex items-center">
                                     <User className="w-4 h-4 mr-1" />
-                                    {consultation.veterinarian}
+                                    {consultation.veterinarian.name}
                                   </span>
                                   <span className="text-xs bg-background-secondary px-2 py-1 rounded">
-                                    {consultation.specialty}
+                                    Veterinário
                                   </span>
                                 </div>
                               </div>
-
                               <div className="flex items-center space-x-2">
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() =>
-                                    setExpandedConsultation(
+                                                                        setExpandedConsultation(
                                       expandedConsultation ===
-                                        consultation.consultation_id
-                                        ? null
-                                        : consultation.consultation_id,
+                                        consultation.id
+                                          ? null
+                                          : consultation.id,
                                     )
                                   }
                                 >
                                   {expandedConsultation ===
-                                  consultation.consultation_id
+                                  consultation.id
                                     ? "Ocultar"
                                     : "Expandir"}
                                 </Button>
                                 <Button variant="ghost" size="sm">
                                   <Link
-                                    href={`/dashboard/consultations/${consultation.consultation_id}`}
+                                    href={`/dashboard/consultations/${consultation.id}`}
                                   >
                                     <Eye className="w-4 h-4" />
                                   </Link>
                                 </Button>
                               </div>
                             </div>
-
                             <p className="text-text-primary mb-4">
-                              {consultation.description}
+                              {consultation.notes || 'Nenhuma observação registrada'}
                             </p>
-
                             {/* Vital Signs */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                               <div className="flex items-center space-x-2 p-2 bg-background-secondary rounded">
@@ -545,7 +582,7 @@ export default function PetMedicalHistoryPage() {
                                     Peso
                                   </div>
                                   <div className="font-medium text-text-primary">
-                                    {consultation.weight} kg
+                                    N/A
                                   </div>
                                 </div>
                               </div>
@@ -556,7 +593,7 @@ export default function PetMedicalHistoryPage() {
                                     Temp
                                   </div>
                                   <div className="font-medium text-text-primary">
-                                    {consultation.temperature}°C
+                                    N/A
                                   </div>
                                 </div>
                               </div>
@@ -567,7 +604,7 @@ export default function PetMedicalHistoryPage() {
                                     FC
                                   </div>
                                   <div className="font-medium text-text-primary">
-                                    {consultation.heartRate} bpm
+                                    N/A
                                   </div>
                                 </div>
                               </div>
@@ -578,19 +615,15 @@ export default function PetMedicalHistoryPage() {
                                     FR
                                   </div>
                                   <div className="font-medium text-text-primary">
-                                    {consultation.respiratoryRate} rpm
+                                    N/A
                                   </div>
                                 </div>
                               </div>
                             </div>
-
                             {/* Expanded Details */}
                             {expandedConsultation ===
-                              consultation.consultation_id && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                exit={{ opacity: 0, height: 0 }}
+                              consultation.id && (
+                              <div
                                 className="border-t border-border pt-4 space-y-4"
                               >
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -599,115 +632,80 @@ export default function PetMedicalHistoryPage() {
                                       Sintomas
                                     </h5>
                                     <ul className="space-y-1">
-                                      {consultation.symptoms.map(
-                                        (symptom, i) => (
-                                          <li
-                                            key={i}
-                                            className="text-sm text-text-secondary flex items-center"
-                                          >
-                                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full mr-2" />
-                                            {symptom}
-                                          </li>
-                                        ),
-                                      )}
+                                      <li className="text-sm text-text-secondary flex items-center">
+                                        <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full mr-2" />
+                                        Nenhum sintoma registrado
+                                      </li>
                                     </ul>
                                   </div>
-
                                   <div>
                                     <h5 className="font-medium text-text-primary mb-2">
                                       Diagnóstico
                                     </h5>
                                     <p className="text-sm text-text-secondary">
-                                      {consultation.diagnosis}
+                                      {consultation.diagnosis || 'Nenhum diagnóstico registrado'}
                                     </p>
                                   </div>
-
                                   <div>
                                     <h5 className="font-medium text-text-primary mb-2">
                                       Tratamento
                                     </h5>
                                     <ul className="space-y-1">
-                                      {consultation.treatment.map(
-                                        (treatment, i) => (
-                                          <li
-                                            key={i}
-                                            className="text-sm text-text-secondary flex items-center"
-                                          >
-                                            <div className="w-1.5 h-1.5 bg-success rounded-full mr-2" />
-                                            {treatment}
-                                          </li>
-                                        ),
-                                      )}
+                                      <li className="text-sm text-text-secondary flex items-center">
+                                        <div className="w-1.5 h-1.5 bg-success rounded-full mr-2" />
+                                        {consultation.treatment || 'Nenhum tratamento registrado'}
+                                      </li>
                                     </ul>
                                   </div>
-
-                                  {consultation.prescriptions.length > 0 && (
+                                  {false && (
                                     <div>
                                       <h5 className="font-medium text-text-primary mb-2">
                                         Prescrições
                                       </h5>
                                       <ul className="space-y-1">
-                                        {consultation.prescriptions.map(
-                                          (prescription, i) => (
-                                            <li
-                                              key={i}
-                                              className="text-sm text-text-secondary flex items-center"
-                                            >
-                                              <Pill className="w-3 h-3 mr-2 text-accent-500" />
-                                              {prescription}
-                                            </li>
-                                          ),
-                                        )}
+                                        <li className="text-sm text-text-secondary flex items-center">
+                                          <Pill className="w-3 h-3 mr-2 text-accent-500" />
+                                          Nenhuma prescrição registrada
+                                        </li>
                                       </ul>
                                     </div>
                                   )}
                                 </div>
-
-                                {consultation.files.length > 0 && (
+                                {false && (
                                   <div>
                                     <h5 className="font-medium text-text-primary mb-2">
                                       Arquivos
                                     </h5>
                                     <div className="flex flex-wrap gap-2">
-                                      {consultation.files.map((file, i) => (
-                                        <div
-                                          key={i}
-                                          className="flex items-center space-x-2 bg-background-secondary px-3 py-2 rounded"
-                                        >
-                                          <FileText className="w-4 h-4 text-text-tertiary" />
-                                          <span className="text-sm text-text-primary">
-                                            {file}
-                                          </span>
-                                          <Button variant="ghost" size="sm">
-                                            <Eye className="w-3 h-3" />
-                                          </Button>
-                                        </div>
-                                      ))}
+                                      <div className="flex items-center space-x-2 bg-background-secondary px-3 py-2 rounded">
+                                        <FileText className="w-4 h-4 text-text-tertiary" />
+                                        <span className="text-sm text-text-primary">
+                                          Nenhum arquivo anexado
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 )}
-
-                                {consultation.nextVisit && (
+                                {false && (
                                   <div className="bg-primary/10 p-3 rounded-lg">
                                     <div className="flex items-center space-x-2">
                                       <Calendar className="w-4 h-4 text-primary-600" />
                                       <span className="text-sm font-medium text-primary-600">
                                         Próxima visita:{" "}
-                                        {formatDate(consultation.nextVisit)}
+                                        Não agendada
                                       </span>
                                     </div>
                                   </div>
                                 )}
-                              </motion.div>
+                              </div>
                             )}
                           </CardContent>
                         </Card>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
-
               {filteredConsultations.length === 0 && (
                 <div className="text-center py-12">
                   <Stethoscope className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
@@ -722,7 +720,6 @@ export default function PetMedicalHistoryPage() {
             </CardContent>
           </Card>
         </div>
-
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Quick Stats */}
@@ -735,30 +732,28 @@ export default function PetMedicalHistoryPage() {
             <CardContent className="space-y-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary-500 mb-1">
-                  {mockMedicalHistory.consultations.length}
+                  {pet.consultations?.length || 0}
                 </div>
                 <div className="text-sm text-text-secondary">
                   Total de Consultas
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
                   <div className="text-lg font-bold text-success">
-                    {mockMedicalHistory.vaccinations.length}
+                    0
                   </div>
                   <div className="text-xs text-text-secondary">Vacinas</div>
                 </div>
                 <div>
                   <div className="text-lg font-bold text-warning">
-                    {mockMedicalHistory.procedures.length}
+                    0
                   </div>
                   <div className="text-xs text-text-secondary">
                     Procedimentos
                   </div>
                 </div>
               </div>
-
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Última consulta:</span>
@@ -775,13 +770,12 @@ export default function PetMedicalHistoryPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Condições ativas:</span>
                   <span className="text-warning">
-                    {mockMedicalHistory.conditions.length}
+                    0
                   </span>
                 </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Current Conditions */}
           <Card>
             <CardHeader>
@@ -792,36 +786,12 @@ export default function PetMedicalHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockMedicalHistory.conditions.map((condition, index) => (
-                  <motion.div
-                    key={condition.id}
-                    className={`p-3 rounded-lg ${getConditionSeverityColor(condition.severity)}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-medium">{condition.name}</h4>
-                        <p className="text-sm opacity-80 mt-1">
-                          {condition.description}
-                        </p>
-                        <div className="text-xs opacity-70 mt-2">
-                          Diagnosticado: {formatDate(condition.diagnosedDate)}
-                        </div>
-                      </div>
-                      <span className="text-xs px-2 py-1 bg-white/20 rounded">
-                        {condition.status === "monitoring"
-                          ? "Monitorando"
-                          : "Controlado"}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
+                <div className="text-center py-4 text-text-secondary">
+                  Nenhuma condição médica registrada
+                </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Allergies */}
           <Card>
             <CardHeader>
@@ -832,32 +802,12 @@ export default function PetMedicalHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockMedicalHistory.allergies.map((allergy, index) => (
-                  <motion.div
-                    key={allergy.id}
-                    className={`p-3 rounded-lg ${getAllergySeverityColor(allergy.severity)}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">{allergy.allergen}</h4>
-                      <span className="text-xs px-2 py-1 bg-white/20 rounded">
-                        {allergy.severity === "severe"
-                          ? "Grave"
-                          : allergy.severity === "moderate"
-                            ? "Moderada"
-                            : "Leve"}
-                      </span>
-                    </div>
-                    <p className="text-sm opacity-80">{allergy.reaction}</p>
-                    <p className="text-xs opacity-70 mt-2">{allergy.notes}</p>
-                  </motion.div>
-                ))}
+                <div className="text-center py-4 text-text-secondary">
+                  Nenhuma alergia registrada
+                </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Recent Vaccinations */}
           <Card>
             <CardHeader>
@@ -868,47 +818,12 @@ export default function PetMedicalHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockMedicalHistory.vaccinations
-                  .slice(0, 3)
-                  .map((vaccine, index) => (
-                    <motion.div
-                      key={vaccine.id}
-                      className="p-3 bg-background-secondary rounded-lg"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-text-primary">
-                          {vaccine.name}
-                        </h4>
-                        <span
-                          className={`text-xs px-2 py-1 rounded ${
-                            vaccine.status === "current"
-                              ? "bg-success/20 text-success"
-                              : vaccine.status === "due_soon"
-                                ? "bg-warning/20 text-warning"
-                                : "bg-error/20 text-error"
-                          }`}
-                        >
-                          {vaccine.status === "current"
-                            ? "Em dia"
-                            : vaccine.status === "due_soon"
-                              ? "Vence em breve"
-                              : "Atrasada"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-text-secondary space-y-1">
-                        <div>Aplicada: {formatDate(vaccine.date)}</div>
-                        <div>Próxima: {formatDate(vaccine.nextDue)}</div>
-                        <div>Lote: {vaccine.batch}</div>
-                      </div>
-                    </motion.div>
-                  ))}
+                <div className="text-center py-4 text-text-secondary">
+                  Nenhuma vacina registrada
+                </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Procedures */}
           <Card>
             <CardHeader>
@@ -919,39 +834,12 @@ export default function PetMedicalHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockMedicalHistory.procedures.map((procedure, index) => (
-                  <motion.div
-                    key={procedure.id}
-                    className="p-3 bg-background-secondary rounded-lg"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-text-primary">
-                        {procedure.name}
-                      </h4>
-                      <span className="text-xs px-2 py-1 bg-success/20 text-success rounded">
-                        Concluído
-                      </span>
-                    </div>
-                    <p className="text-sm text-text-secondary mb-2">
-                      {procedure.description}
-                    </p>
-                    <div className="text-xs text-text-tertiary">
-                      {formatDate(procedure.date)} • {procedure.veterinarian}
-                    </div>
-                    {"chipNumber" in procedure && (
-                      <div className="text-xs text-text-tertiary mt-1">
-                        Chip: {procedure.chipNumber}
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+                <div className="text-center py-4 text-text-secondary">
+                  Nenhum procedimento registrado
+                </div>
               </div>
             </CardContent>
           </Card>
-
           {/* Weight Trend */}
           <Card>
             <CardHeader>
@@ -962,32 +850,25 @@ export default function PetMedicalHistoryPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {mockMedicalHistory.consultations
+                {(pet.consultations || [])
                   .slice(0, 5)
                   .map((consultation, index) => {
-                    const prevWeight =
-                      mockMedicalHistory.consultations[index + 1]?.weight;
-                    const weightChange = prevWeight
-                      ? consultation.weight - prevWeight
-                      : 0;
-
+                    const prevWeight = 0; // Peso não disponível na API
+                    const weightChange = 0;
                     return (
-                      <motion.div
-                        key={consultation.consultation_id}
+                      <div
+                        key={consultation.id}
                         className="flex items-center justify-between p-2 bg-background-secondary rounded"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
                       >
                         <div>
                           <div className="font-medium text-text-primary">
-                            {consultation.weight} kg
+                            N/A
                           </div>
                           <div className="text-xs text-text-secondary">
                             {formatDate(consultation.date)}
                           </div>
                         </div>
-                        {weightChange !== 0 && (
+                        {false && (
                           <div
                             className={`text-xs font-medium ${
                               weightChange > 0 ? "text-warning" : "text-success"
@@ -997,7 +878,7 @@ export default function PetMedicalHistoryPage() {
                             {weightChange.toFixed(1)} kg
                           </div>
                         )}
-                      </motion.div>
+                      </div>
                     );
                   })}
               </div>

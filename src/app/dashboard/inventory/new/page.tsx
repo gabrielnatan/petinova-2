@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,7 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
+import { productAPI } from "@/lib/api/products";
 // Schema de validação
 const newProductSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -38,9 +37,7 @@ const newProductSchema = z.object({
   location: z.string().optional(),
   batch: z.string().optional(),
 });
-
 type NewProductFormData = z.infer<typeof newProductSchema>;
-
 const productTypes = [
   "Medicamento",
   "Alimento",
@@ -51,7 +48,6 @@ const productTypes = [
   "Material Cirúrgico",
   "Vacina",
 ];
-
 const units = [
   "un",
   "kg",
@@ -66,10 +62,9 @@ const units = [
   "caixa",
   "pacote",
 ];
-
 export default function NewProductPage() {
   const [suggestedMargin, setSuggestedMargin] = useState<number>(50);
-
+  const router = useRouter();
   const {
     register,
     handleSubmit,
@@ -85,38 +80,38 @@ export default function NewProductPage() {
       salePrice: 0,
     },
   });
-
   const watchCostPrice = watch("costPrice");
   const watchSalePrice = watch("salePrice");
   const watchType = watch("type");
-
   // Calcular margem de lucro
   const margin =
     watchCostPrice && watchSalePrice
       ? ((watchSalePrice - watchCostPrice) / watchCostPrice) * 100
       : 0;
-
   const onSubmit = async (data: NewProductFormData) => {
     try {
-      console.log("Creating product:", data);
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Redirect to inventory
-      window.location.href = "/dashboard/inventory";
+      const createData = {
+        name: data.name,
+        description: data.description,
+        supplier: data.supplier,
+        purchasePrice: data.costPrice,
+        stock: data.quantity,
+        expirationDate: data.validity?.toISOString(),
+        notes: data.description,
+      };
+      
+      await productAPI.createProduct(createData);
+      router.push("/dashboard/inventory");
     } catch (error) {
       console.error("Error creating product:", error);
     }
   };
-
   const calculateSuggestedPrice = () => {
     if (watchCostPrice) {
       const suggestedPrice = watchCostPrice * (1 + suggestedMargin / 100);
       setValue("salePrice", Number(suggestedPrice.toFixed(2)));
     }
   };
-
   const applyMarginPreset = (marginPercent: number) => {
     setSuggestedMargin(marginPercent);
     if (watchCostPrice) {
@@ -124,7 +119,6 @@ export default function NewProductPage() {
       setValue("salePrice", Number(suggestedPrice.toFixed(2)));
     }
   };
-
   const getTypeIcon = (type: string) => {
     const icons: Record<string, string> = {
       Medicamento: "💊",
@@ -138,7 +132,6 @@ export default function NewProductPage() {
     };
     return icons[type] || "📦";
   };
-
   return (
     <div className="p-6  mx-auto">
       {/* Header */}
@@ -156,7 +149,6 @@ export default function NewProductPage() {
           </p>
         </div>
       </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form */}
@@ -177,7 +169,6 @@ export default function NewProductPage() {
                   placeholder="Ex: Ração Premium Cães Adultos"
                   icon={Package}
                 />
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">
@@ -200,7 +191,6 @@ export default function NewProductPage() {
                       </p>
                     )}
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-text-primary mb-2">
                       Unidade de Medida
@@ -223,7 +213,6 @@ export default function NewProductPage() {
                     )}
                   </div>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-text-primary mb-2">
                     Descrição (Opcional)
@@ -237,7 +226,6 @@ export default function NewProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Stock Information */}
             <Card>
               <CardHeader>
@@ -256,7 +244,6 @@ export default function NewProductPage() {
                     placeholder="0"
                     min="0"
                   />
-
                   <Input
                     label="Estoque Mínimo"
                     type="number"
@@ -266,14 +253,12 @@ export default function NewProductPage() {
                     min="1"
                   />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="Localização no Estoque (Opcional)"
                     {...register("location")}
                     placeholder="Ex: Prateleira A2, Geladeira 1"
                   />
-
                   <Input
                     label="Código de Barras (Opcional)"
                     {...register("barcode")}
@@ -281,14 +266,12 @@ export default function NewProductPage() {
                     icon={Barcode}
                   />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
                     label="Lote (Opcional)"
                     {...register("batch")}
                     placeholder="Ex: L2024001"
                   />
-
                   <Input
                     label="Data de Validade (Opcional)"
                     type="date"
@@ -299,7 +282,6 @@ export default function NewProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Financial Information */}
             <Card>
               <CardHeader>
@@ -319,7 +301,6 @@ export default function NewProductPage() {
                     placeholder="0,00"
                     icon={DollarSign}
                   />
-
                   <div>
                     <Input
                       label="Preço de Venda"
@@ -358,11 +339,8 @@ export default function NewProductPage() {
                     </div>
                   </div>
                 </div>
-
                 {watchCostPrice > 0 && watchSalePrice > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                  <div
                     className={`p-4 rounded-lg ${
                       margin >= 30
                         ? "bg-success/10 border border-success/20"
@@ -399,11 +377,10 @@ export default function NewProductPage() {
                         }`}
                       />
                     </div>
-                  </motion.div>
+                  </div>
                 )}
               </CardContent>
             </Card>
-
             {/* Supplier Information */}
             <Card>
               <CardHeader>
@@ -423,7 +400,6 @@ export default function NewProductPage() {
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Preview */}
@@ -449,7 +425,6 @@ export default function NewProductPage() {
                       </p>
                     </div>
                   </div>
-
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-text-secondary">Estoque:</span>
@@ -483,7 +458,6 @@ export default function NewProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Pricing Calculator */}
             <Card>
               <CardHeader>
@@ -505,7 +479,6 @@ export default function NewProductPage() {
                     max="500"
                   />
                 </div>
-
                 <Button
                   type="button"
                   variant="secondary"
@@ -516,7 +489,6 @@ export default function NewProductPage() {
                   <Calculator className="w-4 h-4 mr-2" />
                   Calcular Preço
                 </Button>
-
                 {watchCostPrice > 0 && (
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
@@ -539,7 +511,6 @@ export default function NewProductPage() {
                 )}
               </CardContent>
             </Card>
-
             {/* Tips */}
             <Card>
               <CardHeader>
@@ -558,14 +529,12 @@ export default function NewProductPage() {
                     para especialidades.
                   </p>
                 </div>
-
                 <div className="p-3 bg-warning/10 rounded-lg">
                   <h4 className="font-medium text-warning mb-1">📦 Estoque</h4>
                   <p className="text-sm text-warning/80">
                     Define o estoque mínimo baseado no consumo médio mensal.
                   </p>
                 </div>
-
                 <div className="p-3 bg-success/10 rounded-lg">
                   <h4 className="font-medium text-success mb-1">📅 Validade</h4>
                   <p className="text-sm text-success/80">
@@ -575,7 +544,6 @@ export default function NewProductPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Actions */}
             <Card>
               <CardHeader>
@@ -588,7 +556,6 @@ export default function NewProductPage() {
                   <Save className="w-4 h-4 mr-2" />
                   {isSubmitting ? "Salvando..." : "Cadastrar Produto"}
                 </Button>
-
                 <Button variant="secondary" className="w-full" asChild>
                   <Link href="/dashboard/inventory" className="flex items-center justify-center">Cancelar</Link>
                 </Button>

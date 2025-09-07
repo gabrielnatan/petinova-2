@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -33,7 +31,6 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { consultationAPI, type Consultation } from "@/lib/api/consultations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
 function ConsultationCard({ 
   consultation, 
   onDelete 
@@ -43,13 +40,8 @@ function ConsultationCard({
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const router = useRouter();
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+    <div
     >
       <Card className="hover:shadow-lg transition-shadow duration-200">
         <CardContent className="p-6">
@@ -67,7 +59,6 @@ function ConsultationCard({
                 </p>
               </div>
             </div>
-
             <div className="flex items-center space-x-2">
               <div className="text-right">
                 <div className="flex items-center space-x-1 justify-end mb-1">
@@ -85,7 +76,6 @@ function ConsultationCard({
                   </span>
                 </div>
               </div>
-
               <div className="relative">
                 <Button
                   variant="ghost"
@@ -95,13 +85,9 @@ function ConsultationCard({
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
-
                 {showMenu && (
-                  <motion.div
+                  <div
                     className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[160px]"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
                   >
                     <button
                       onClick={() => router.push(`/dashboard/consultations/${consultation.consultation_id}`)}
@@ -134,12 +120,11 @@ function ConsultationCard({
                       <Trash2 className="w-4 h-4 mr-2" />
                       Excluir
                     </button>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </div>
           </div>
-
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-text-secondary">
               <Calendar className="w-4 h-4 mr-2" />
@@ -154,7 +139,6 @@ function ConsultationCard({
               {consultation.veterinarian.name} - {consultation.veterinarian.role}
             </div>
           </div>
-
           <div className="bg-background-secondary rounded-md p-3 mb-3">
             <p className="text-sm text-text-primary line-clamp-2">
               <strong>Diagnóstico:</strong> {consultation.diagnosis}
@@ -165,7 +149,6 @@ function ConsultationCard({
               </p>
             )}
           </div>
-
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
               {/* {consultation.vitalSigns.weight && (
@@ -194,10 +177,9 @@ function ConsultationCard({
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
-
 export default function ConsultationsListPage() {
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,25 +194,19 @@ export default function ConsultationsListPage() {
     total: 0,
     pages: 0
   });
-  
   const router = useRouter();
-
   const loadConsultations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
       const params: any = {
         page: pagination.page,
         limit: pagination.limit,
       };
-      
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== 'all') params.status = statusFilter;
       if (veterinarianFilter !== 'all') params.veterinarianId = veterinarianFilter;
-      
       const response = await consultationAPI.getConsultations(params);
-      
       setConsultations(response.consultations);
       setPagination(response.pagination);
     } catch (err) {
@@ -239,11 +215,9 @@ export default function ConsultationsListPage() {
       setLoading(false);
     }
   }, [pagination.page, pagination.limit, searchTerm, statusFilter, veterinarianFilter]);
-
   useEffect(() => {
     loadConsultations();
   }, [loadConsultations]);
-
   const handleDelete = async (consultationId: string) => {
     try {
       await consultationAPI.deleteConsultation(consultationId);
@@ -252,25 +226,21 @@ export default function ConsultationsListPage() {
       alert(err instanceof Error ? err.message : 'Erro ao excluir consulta');
     }
   };
-
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
-
   const handleFilterChange = (filter: string, value: string) => {
     if (filter === 'status') setStatusFilter(value);
     if (filter === 'veterinarian') setVeterinarianFilter(value);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
-
   const totalConsultations = pagination.total;
   const completedConsultations = consultations.filter(c => c.diagnosis).length;
   const inProgressConsultations = consultations.filter(c => !c.diagnosis).length;
   const thisMonthConsultations = consultations.filter(
     c => new Date(c.created_at).getMonth() === new Date().getMonth()
   ).length;
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -288,7 +258,6 @@ export default function ConsultationsListPage() {
           </Link>
         </Button>
       </div>
-
       {/* Error State */}
       {error && (
         <Card className="border-error">
@@ -308,7 +277,6 @@ export default function ConsultationsListPage() {
           </CardContent>
         </Card>
       )}
-
       {/* Filters and View Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -320,7 +288,6 @@ export default function ConsultationsListPage() {
               icon={Search}
             />
           </div>
-
           <select
             value={statusFilter}
             onChange={(e) => handleFilterChange('status', e.target.value)}
@@ -330,7 +297,6 @@ export default function ConsultationsListPage() {
             <option value="COMPLETED">Concluída</option>
             <option value="IN_PROGRESS">Em Andamento</option>
           </select>
-
           <select
             value={veterinarianFilter}
             onChange={(e) => handleFilterChange('veterinarian', e.target.value)}
@@ -340,7 +306,6 @@ export default function ConsultationsListPage() {
             {/* Veterinarians would be loaded from API in a real implementation */}
           </select>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button
             variant={viewMode === "cards" ? "primary" : "ghost"}
@@ -358,7 +323,6 @@ export default function ConsultationsListPage() {
           </Button>
         </div>
       </div>
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -376,7 +340,6 @@ export default function ConsultationsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -390,7 +353,6 @@ export default function ConsultationsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -404,7 +366,6 @@ export default function ConsultationsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -419,7 +380,6 @@ export default function ConsultationsListPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Content */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -439,17 +399,14 @@ export default function ConsultationsListPage() {
       ) : viewMode === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {consultations.map((consultation, index) => (
-            <motion.div
+            <div
               key={consultation.consultation_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
             >
               <ConsultationCard 
                 consultation={consultation} 
                 onDelete={handleDelete}
               />
-            </motion.div>
+            </div>
           ))}
         </div>
       ) : (
@@ -530,7 +487,6 @@ export default function ConsultationsListPage() {
           </Table>
         </Card>
       )}
-
       {/* Pagination */}
       {pagination.pages > 1 && (
         <div className="flex items-center justify-between">
@@ -562,7 +518,6 @@ export default function ConsultationsListPage() {
           </div>
         </div>
       )}
-
       {!loading && consultations.length === 0 && (
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-text-tertiary mx-auto mb-4" />

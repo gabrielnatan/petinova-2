@@ -1,7 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,90 +15,41 @@ import {
   AlertCircle,
   Phone,
   Mail,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatPhone } from "@/lib/utils";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
+import { appointmentAPI, type Guardian, type Veterinarian, type Pet } from "@/lib/api/appointments";
+import { useAuth } from "@/store";
 // Schema de validação
 const newAppointmentSchema = z.object({
   dateTime: z.string().min(1, "Data e hora são obrigatórias"),
-  notes: z.string().min(1, "Observações são obrigatórias"),
+  notes: z.string().optional(),
   veterinarianId: z.string().min(1, "Veterinário é obrigatório"),
   guardianId: z.string().min(1, "Tutor é obrigatório"),
   petId: z.string().min(1, "Pet é obrigatório"),
 });
-
 type NewAppointmentFormData = z.infer<typeof newAppointmentSchema>;
-
-// Mock data
-const mockGuardians = [
-  {
-    guardian_id: "1",
-    fullName: "João Silva",
-    email: "joao@email.com",
-    phone: "11999999999",
-    pets: [
-      { pet_id: "1", name: "Buddy", species: "Cão", breed: "Golden Retriever" },
-      { pet_id: "2", name: "Rex", species: "Cão", breed: "Pastor Alemão" },
-    ],
-  },
-  {
-    guardian_id: "2",
-    fullName: "Maria Santos",
-    email: "maria@email.com",
-    phone: "11888888888",
-    pets: [{ pet_id: "3", name: "Luna", species: "Gato", breed: "Siamês" }],
-  },
-  {
-    guardian_id: "3",
-    fullName: "Pedro Costa",
-    email: "pedro@email.com",
-    phone: "11777777777",
-    pets: [
-      { pet_id: "4", name: "Max", species: "Cão", breed: "Bulldog" },
-      { pet_id: "5", name: "Mia", species: "Gato", breed: "Persa" },
-    ],
-  },
-];
-
-const mockVeterinarians = [
-  {
-    veterinarian_id: "1",
-    fullName: "Dra. Maria Santos",
-    specialty: "Clínica Geral",
-    crmv: "12345/SP",
-    availableHours: ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
-  },
-  {
-    veterinarian_id: "2",
-    fullName: "Dr. Carlos Lima",
-    specialty: "Cirurgia",
-    crmv: "23456/SP",
-    availableHours: ["08:00", "09:00", "13:00", "14:00", "15:00"],
-  },
-  {
-    veterinarian_id: "3",
-    fullName: "Dra. Ana Oliveira",
-    specialty: "Dermatologia",
-    crmv: "34567/SP",
-    availableHours: ["10:00", "11:00", "14:00", "15:00", "16:00", "17:00"],
-  },
-];
-
+// Não precisamos dessa interface, vamos usar Guardian diretamente
 export default function NewAppointmentPage() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedGuardian, setSelectedGuardian] = useState<
-    (typeof mockGuardians)[0] | null
-  >(null);
-  const [selectedPet, setSelectedPet] = useState<
-    (typeof mockGuardians)[0]["pets"][0] | null
-  >(null);
+  const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
+  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [guardianSearch, setGuardianSearch] = useState("");
   const [showNewGuardianForm, setShowNewGuardianForm] = useState(false);
-
+  // API Data
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [veterinarians, setVeterinarians] = useState<Veterinarian[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const router = useRouter();
+  const { isAuthenticated, checkAuth } = useAuth();
   const {
     register,
     handleSubmit,
@@ -117,66 +66,107 @@ export default function NewAppointmentPage() {
       petId: "",
     },
   });
-
   const watchedVeterinarian = watch("veterinarianId");
   const watchedDateTime = watch("dateTime");
+  // Verificar autenticação
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkAuth();
+      setAuthChecked(true);
+    };
+    initAuth();
+  }, [checkAuth]);
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (authChecked && !isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+  }, [isAuthenticated, router, authChecked]);
+  // Carregar dados iniciais
+  useEffect(() => {
+    if (!authChecked || !isAuthenticated) return;
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        const [guardiansData, veterinariansData] = await Promise.all([
+          appointmentAPI.getGuardians(),
+          appointmentAPI.getVeterinarians()
+        ]);
+        setGuardians(guardiansData);
+        setVeterinarians(veterinariansData);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setError("Erro ao carregar dados");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitialData();
+  }, [authChecked, isAuthenticated]);
 
   // Filtrar tutores baseado na busca
-  const filteredGuardians = mockGuardians.filter(
+  const filteredGuardians = guardians.filter(
     (guardian) =>
-      guardian.fullName.toLowerCase().includes(guardianSearch.toLowerCase()) ||
-      guardian.email.toLowerCase().includes(guardianSearch.toLowerCase()) ||
-      guardian.phone.includes(guardianSearch),
+      (guardian.fullName && guardian.fullName.toLowerCase().includes(guardianSearch.toLowerCase())) ||
+      (guardian.email && guardian.email.toLowerCase().includes(guardianSearch.toLowerCase())) ||
+      (guardian.phone && guardian.phone.includes(guardianSearch)),
   );
-
-  const selectedVeterinarian = mockVeterinarians.find(
+  const selectedVeterinarian = veterinarians.find(
     (v) => v.veterinarian_id === watchedVeterinarian,
   );
-
   const onSubmit = async (data: NewAppointmentFormData) => {
     try {
-      console.log("Creating appointment:", data);
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Redirect to appointments list
-      window.location.href = "/dashboard/appointments";
+      // Converter dateTime para date e time separados
+      const [date, time] = data.dateTime.split('T');
+      await appointmentAPI.createAppointment({
+        date,
+        time,
+        petId: data.petId,
+        veterinarianId: data.veterinarianId,
+        guardianId: data.guardianId,
+        notes: data.notes,
+        type: 'CONSULTATION',
+        status: 'SCHEDULED'
+      });
+      router.push("/dashboard/appointments");
     } catch (error) {
       console.error("Error creating appointment:", error);
+      setError("Erro ao criar agendamento");
     }
   };
-
-  const handleGuardianSelect = (guardian: (typeof mockGuardians)[0]) => {
-    setSelectedGuardian(guardian);
-    setValue("guardianId", guardian.guardian_id);
-    setCurrentStep(2);
+  const handleGuardianSelect = async (guardian: Guardian) => {
+    try {
+      setSelectedGuardian(guardian);
+      setValue("guardianId", guardian.guardian_id);
+      // Carregar pets do tutor
+      const guardianPets = await appointmentAPI.getPetsByGuardian(guardian.guardian_id);
+      setPets(guardianPets);
+      setCurrentStep(2);
+    } catch (error) {
+      console.error("Error loading pets:", error);
+      setError("Erro ao carregar pets do tutor");
+    }
   };
-
-  const handlePetSelect = (pet: (typeof mockGuardians)[0]["pets"][0]) => {
+  const handlePetSelect = (pet: Pet) => {
     setSelectedPet(pet);
     setValue("petId", pet.pet_id);
     setCurrentStep(3);
   };
-
   const getMinDateTime = () => {
     const now = new Date();
     now.setMinutes(now.getMinutes() + 30); // Mínimo 30 minutos a partir de agora
     return now.toISOString().slice(0, 16);
   };
-
-  const isTimeAvailable = (dateTime: string, veterinarianId: string) => {
+  const checkAvailability = async (dateTime: string, veterinarianId: string) => {
     if (!dateTime || !veterinarianId) return false;
-
-    const selectedDate = new Date(dateTime);
-    const time = selectedDate.toTimeString().slice(0, 5);
-    const veterinarian = mockVeterinarians.find(
-      (v) => v.veterinarian_id === veterinarianId,
-    );
-
-    return veterinarian?.availableHours.includes(time) || false;
+    try {
+      return await appointmentAPI.checkAvailability(veterinarianId, dateTime);
+    } catch (error) {
+      console.error("Error checking availability:", error);
+      return false;
+    }
   };
-
   const renderStep1 = () => (
     <Card>
       <CardHeader>
@@ -203,14 +193,10 @@ export default function NewAppointmentPage() {
             Novo Tutor
           </Button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-          {filteredGuardians.map((guardian) => (
-            <motion.div
-              key={guardian.guardian_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ y: -2 }}
+          {filteredGuardians.map((guardian, index) => (
+            <div
+              key={guardian.guardian_id || `guardian-${index}`}
               className="p-4 border border-border rounded-lg cursor-pointer hover:border-primary-300 transition-colors"
               onClick={() => handleGuardianSelect(guardian)}
             >
@@ -227,22 +213,22 @@ export default function NewAppointmentPage() {
                       <Mail className="w-3 h-3 mr-1" />
                       {guardian.email}
                     </div>
-                    <div className="flex items-center">
-                      <Phone className="w-3 h-3 mr-1" />
-                      {formatPhone(guardian.phone)}
-                    </div>
+                    {guardian.phone && (
+                      <div className="flex items-center">
+                        <Phone className="w-3 h-3 mr-1" />
+                        {formatPhone(guardian.phone)}
+                      </div>
+                    )}
                     <div className="flex items-center">
                       <Heart className="w-3 h-3 mr-1" />
-                      {guardian.pets.length} pet
-                      {guardian.pets.length !== 1 ? "s" : ""}
+                      Ver pets
                     </div>
                   </div>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
-
         {filteredGuardians.length === 0 && guardianSearch && (
           <div className="text-center py-8">
             <User className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
@@ -261,7 +247,6 @@ export default function NewAppointmentPage() {
       </CardContent>
     </Card>
   );
-
   const renderStep2 = () => (
     <Card>
       <CardHeader>
@@ -270,12 +255,13 @@ export default function NewAppointmentPage() {
             <Heart className="w-5 h-5 mr-2" />
             2. Selecionar Pet
           </h2>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentStep(1)}>
+          <Button key="change-guardian" variant="ghost" size="sm" onClick={() => setCurrentStep(1)}>
             Alterar Tutor
           </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Olá cursor, olhe aqui deveria aparecer a lista de pets para serem selecionados, porem nao aparece, deve aparecer somente do guardian selecionado, eu seleciono um que tem 2 pets e ele nao aparece */}
         {selectedGuardian && (
           <>
             <div className="p-3 bg-background-secondary rounded-lg">
@@ -294,14 +280,10 @@ export default function NewAppointmentPage() {
                 <Check className="w-5 h-5 text-success ml-auto" />
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedGuardian.pets.map((pet) => (
-                <motion.div
-                  key={pet.pet_id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ y: -2 }}
+              {pets.length > 0 ? pets.map((pet, index) => (
+                <div
+                  key={pet.pet_id || `pet-${index}`}
                   className="p-4 border border-border rounded-lg cursor-pointer hover:border-primary-300 transition-colors"
                   onClick={() => handlePetSelect(pet)}
                 >
@@ -318,24 +300,40 @@ export default function NewAppointmentPage() {
                       </p>
                     </div>
                   </div>
-                </motion.div>
-              ))}
+                </div>
+              )) : (
+                <div className="col-span-full text-center py-8">
+                  <Heart className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-text-primary mb-2">
+                    Nenhum pet encontrado
+                  </h3>
+                  <p className="text-text-secondary mb-4">
+                    Este tutor ainda não possui pets cadastrados.
+                  </p>
+                  <Button variant="secondary" asChild>
+                    <Link href={`/dashboard/pets/new?guardian=${selectedGuardian.guardian_id}`}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Cadastrar Primeiro Pet
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
-
-            <div className="text-center pt-4">
-              <Button variant="secondary" asChild>
-                <Link href="/dashboard/pets/new" className="flex items-center">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Cadastrar Novo Pet
-                </Link>
-              </Button>
-            </div>
+            {pets.length > 0 && (
+              <div className="text-center pt-4">
+                <Button variant="secondary" asChild>
+                  <Link href={`/dashboard/pets/new?guardian=${selectedGuardian.guardian_id}`} className="flex items-center">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Cadastrar Novo Pet
+                  </Link>
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>
     </Card>
   );
-
   const renderStep3 = () => (
     <Card>
       <CardHeader>
@@ -362,7 +360,6 @@ export default function NewAppointmentPage() {
                   <Check className="w-4 h-4 text-success ml-auto" />
                 </div>
               </div>
-
               <div className="p-3 bg-background-secondary rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-secondary-100 rounded-full flex items-center justify-center">
@@ -380,7 +377,6 @@ export default function NewAppointmentPage() {
                 </div>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-2">
@@ -391,12 +387,12 @@ export default function NewAppointmentPage() {
                   className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
                 >
                   <option value="">Selecione um veterinário</option>
-                  {mockVeterinarians.map((vet) => (
+                  {veterinarians.map((vet, index) => (
                     <option
-                      key={vet.veterinarian_id}
+                      key={vet.veterinarian_id || `vet-${index}`}
                       value={vet.veterinarian_id}
                     >
-                      {vet.fullName} - {vet.specialty}
+                      {vet.fullName} - {vet.role}
                     </option>
                   ))}
                 </select>
@@ -406,7 +402,6 @@ export default function NewAppointmentPage() {
                   </p>
                 )}
               </div>
-
               <Input
                 label="Data e Hora"
                 type="datetime-local"
@@ -416,34 +411,6 @@ export default function NewAppointmentPage() {
                 icon={Calendar}
               />
             </div>
-
-            {watchedDateTime &&
-              watchedVeterinarian &&
-              !isTimeAvailable(watchedDateTime, watchedVeterinarian) && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-warning/10 border border-warning/20 rounded-lg flex items-start space-x-3"
-                >
-                  <AlertCircle className="w-5 h-5 text-warning mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-warning mb-1">
-                      Horário não disponível
-                    </h4>
-                    <p className="text-sm text-warning/80">
-                      O veterinário selecionado não está disponível neste
-                      horário.
-                    </p>
-                    {selectedVeterinarian && (
-                      <p className="text-sm text-warning/80 mt-1">
-                        <strong>Horários disponíveis:</strong>{" "}
-                        {selectedVeterinarian.availableHours.join(", ")}
-                      </p>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-
             <div>
               <label className="block text-sm font-medium text-text-primary mb-2">
                 Observações
@@ -460,19 +427,14 @@ export default function NewAppointmentPage() {
                 </p>
               )}
             </div>
-
             <div className="flex justify-between pt-4">
-              <Button variant="secondary" onClick={() => setCurrentStep(2)}>
+              <Button key="back" variant="secondary" onClick={() => setCurrentStep(2)}>
                 Voltar
               </Button>
               <Button
+                key="submit"
                 type="submit"
                 loading={isSubmitting}
-                disabled={
-                  (watchedDateTime &&
-                  watchedVeterinarian &&
-                  !isTimeAvailable(watchedDateTime, watchedVeterinarian)) as boolean
-                }
               >
                 <Save className="w-4 h-4 mr-2" />
                 {isSubmitting ? "Agendando..." : "Agendar Consulta"}
@@ -483,9 +445,26 @@ export default function NewAppointmentPage() {
       </CardContent>
     </Card>
   );
-
+  if (!authChecked || loading) {
+    return (
+      <div className="p-6 mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Carregando...</span>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div className="p-6  mx-auto">
+    <div className="p-6 mx-auto">
+      {/* Error Display */}
+      {error && (
+        <Card className="border-error mb-6">
+          <CardContent className="p-4">
+            <p className="text-error text-sm">{error}</p>
+          </CardContent>
+        </Card>
+      )}
       {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" asChild>
@@ -503,7 +482,6 @@ export default function NewAppointmentPage() {
           </p>
         </div>
       </div>
-
       {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
@@ -552,32 +530,22 @@ export default function NewAppointmentPage() {
           </span>
         </div>
       </div>
-
       <form onSubmit={handleSubmit(onSubmit)}>
-        <motion.div
+        <div
           key={currentStep}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.3 }}
         >
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
-        </motion.div>
+        </div>
       </form>
-
       {/* New Guardian Modal */}
       {showNewGuardianForm && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+        <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowNewGuardianForm(false)}
         >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+          <div
             className="bg-surface rounded-lg p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
@@ -588,23 +556,23 @@ export default function NewAppointmentPage() {
               Para agilizar o processo, você será redirecionado para a página de
               cadastro de tutores.
             </p>
-
             <div className="flex justify-end space-x-3">
               <Button
+                key="cancel"
                 variant="secondary"
                 onClick={() => setShowNewGuardianForm(false)}
               >
                 Cancelar
               </Button>
-              <Button asChild>
+              <Button key="confirm" asChild>
                 <Link href="/dashboard/guardians/new" className="flex items-center">
                   <Plus className="w-4 h-4 mr-2" />
                   Ir para Cadastro
                 </Link>
               </Button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

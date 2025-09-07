@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Plus,
   Calendar,
@@ -17,6 +15,7 @@ import {
   Check,
   Stethoscope,
   Eye,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +33,9 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { appointmentAPI, type Appointment } from "@/lib/api/appointments";
-
+import { useAuth } from "@/store";
 const statusConfig = {
   SCHEDULED: {
     label: "Agendado",
@@ -63,7 +63,6 @@ const statusConfig = {
     icon: X,
   },
 };
-
 function AppointmentCard({
   appointment,
   onStatusChange,
@@ -76,18 +75,12 @@ function AppointmentCard({
   const [showMenu, setShowMenu] = useState(false);
   const statusInfo = statusConfig[appointment.status as keyof typeof statusConfig];
   const dateTime = parseISO(appointment.dateTime);
-
   const handleStatusChange = (newStatus: string) => {
     onStatusChange?.(appointment.appointment_id, newStatus);
     setShowMenu(false);
   };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+    <div
     >
       <Card className="hover:shadow-lg transition-all duration-200 border-l-4 border-l-primary-400">
         <CardContent className="p-4">
@@ -105,14 +98,12 @@ function AppointmentCard({
                 </p>
               </div>
             </div>
-
             <div className="flex items-center space-x-2">
               <span
                 className={`px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
               >
                 {statusInfo.label}
               </span>
-
               <div className="relative">
                 <Button
                   variant="ghost"
@@ -122,13 +113,9 @@ function AppointmentCard({
                 >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
-
                 {showMenu && (
-                  <motion.div
+                  <div
                     className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[180px]"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
                   >
                     <Button
                       variant="ghost"
@@ -193,12 +180,11 @@ function AppointmentCard({
                       <X className="w-4 h-4 mr-2" />
                       Cancelar
                     </Button>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </div>
           </div>
-
           <div className="space-y-2 mb-3">
             <div className="flex items-center text-sm text-text-secondary">
               <Clock className="w-4 h-4 mr-2" />
@@ -206,17 +192,16 @@ function AppointmentCard({
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <User className="w-4 h-4 mr-2" />
-              {appointment.guardian.name}
+              {appointment.guardian.fullName}
             </div>
             <div className="flex items-center text-sm text-text-secondary">
               <Stethoscope className="w-4 h-4 mr-2" />
-              {appointment.veterinarian.name}
+              {appointment.veterinarian.fullName}
             </div>
           </div>
-
           <div className="bg-background-secondary rounded-md p-3">
             <p className="text-sm text-text-primary font-medium mb-1">
-              {appointment.veterinarian.specialty || 'Clínica Geral'}
+              {appointment.veterinarian.role}
             </p>
             {appointment.notes && (
               <p className="text-sm text-text-secondary line-clamp-2">
@@ -226,10 +211,9 @@ function AppointmentCard({
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
-
 function WeeklyCalendar({
   selectedDate,
   onDateChange,
@@ -242,7 +226,6 @@ function WeeklyCalendar({
   const weekStart = startOfWeek(selectedDate, { locale: ptBR });
   const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
-
   return (
     <div className="grid grid-cols-7 gap-2">
       {days.map((day) => {
@@ -251,20 +234,17 @@ function WeeklyCalendar({
         );
         const isCurrentDay = isToday(day);
         const isSelected = isSameDay(day, selectedDate);
-
         return (
-          <motion.button
+          <button
             key={day.toISOString()}
             onClick={() => onDateChange(day)}
-            className={`p-3 rounded-lg text-left border transition-all duration-200 ${
+            className={`w-full p-3 border rounded-lg text-center transition-all duration-200 ${
               isSelected
                 ? "bg-primary-500 text-text-inverse border-primary-500 shadow-md"
                 : isCurrentDay
                 ? "bg-primary-50 text-primary-700 border-primary-200"
                 : "bg-surface border-border hover:bg-background-secondary hover:border-primary-300"
             }`}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
             <div className="text-xs opacity-75 mb-1">
               {format(day, "EEE", { locale: ptBR }).toUpperCase()}
@@ -296,13 +276,12 @@ function WeeklyCalendar({
                 </div>
               )}
             </div>
-          </motion.button>
+          </button>
         );
       })}
     </div>
   );
 }
-
 export default function AppointmentsPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
@@ -311,49 +290,60 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-
+  const [authChecked, setAuthChecked] = useState(false);
+  const router = useRouter();
+  const { isAuthenticated, checkAuth } = useAuth();
+  // Verificar autenticação
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkAuth();
+      setAuthChecked(true);
+    };
+    initAuth();
+  }, [checkAuth]);
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (authChecked && !isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+  }, [isAuthenticated, router, authChecked]);
   const loadAppointments = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setLoading(true);
       setError(null);
-      
       // Carregar agendamentos da semana atual para o calendário
       const weekStart = startOfWeek(selectedDate, { locale: ptBR });
       const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
-      
       const response = await appointmentAPI.getAppointmentsByWeek(
         format(weekStart, 'yyyy-MM-dd'),
         format(weekEnd, 'yyyy-MM-dd')
       );
-      
       setAppointments(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar agendamentos');
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
-
+  }, [selectedDate, isAuthenticated]);
   useEffect(() => {
-    loadAppointments();
-  }, [selectedDate, loadAppointments]);
-
+    if (authChecked && isAuthenticated) {
+      loadAppointments();
+    }
+  }, [selectedDate, loadAppointments, authChecked, isAuthenticated]);
   const dayAppointments = appointments
     .filter((app) => isSameDay(parseISO(app.dateTime), selectedDate))
     .sort((a, b) => parseISO(a.dateTime).getTime() - parseISO(b.dateTime).getTime());
-
   const filteredAppointments = dayAppointments.filter((app) => {
     const matchesSearch =
       searchTerm === "" ||
       app.pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.guardian.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.veterinarian.name.toLowerCase().includes(searchTerm.toLowerCase());
-
+      app.guardian.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      app.veterinarian.fullName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || app.status === statusFilter;
-
     return matchesSearch && matchesStatus;
   });
-
   const handleStatusChange = async (appointmentId: string, newStatus: string) => {
     try {
       setUpdatingStatus(appointmentId);
@@ -365,11 +355,19 @@ export default function AppointmentsPage() {
       setUpdatingStatus(null);
     }
   };
-
   const getStatusCount = (status: string) => {
     return dayAppointments.filter((app) => app.status === status).length;
   };
-
+  if (!authChecked) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Carregando...</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -387,7 +385,6 @@ export default function AppointmentsPage() {
           </Link>
         </Button>
       </div>
-
       {/* Calendar Navigation */}
       <Card>
         <CardHeader>
@@ -441,7 +438,6 @@ export default function AppointmentsPage() {
           )}
         </CardContent>
       </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-3 space-y-4">
@@ -454,7 +450,6 @@ export default function AppointmentsPage() {
                 {filteredAppointments.length !== 1 ? "s" : ""})
               </span>
             </h3>
-
             <div className="flex items-center space-x-2">
               <Input
                 placeholder="Buscar agendamentos..."
@@ -463,7 +458,6 @@ export default function AppointmentsPage() {
                 icon={Search}
                 className="w-64"
               />
-
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -478,7 +472,6 @@ export default function AppointmentsPage() {
               </select>
             </div>
           </div>
-
           {/* Appointments List */}
           {filteredAppointments.length === 0 ? (
             <Card>
@@ -505,23 +498,19 @@ export default function AppointmentsPage() {
           ) : (
             <div className="space-y-4">
               {filteredAppointments.map((appointment, index) => (
-                <motion.div
+                <div
                   key={appointment.appointment_id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
                 >
                   <AppointmentCard
                     appointment={appointment}
                     onStatusChange={handleStatusChange}
                     updatingStatus={updatingStatus}
                   />
-                </motion.div>
+                </div>
               ))}
             </div>
           )}
         </div>
-
         {/* Sidebar */}
         <div className="space-y-4">
           {/* Daily Summary */}
@@ -538,7 +527,6 @@ export default function AppointmentsPage() {
                   {dayAppointments.length}
                 </span>
               </div>
-
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
@@ -549,7 +537,6 @@ export default function AppointmentsPage() {
                     {getStatusCount("SCHEDULED")}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-primary-500 rounded-full"></div>
@@ -559,7 +546,6 @@ export default function AppointmentsPage() {
                     {getStatusCount("CONFIRMED")}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-success rounded-full"></div>
@@ -569,7 +555,6 @@ export default function AppointmentsPage() {
                     {getStatusCount("COMPLETED")}
                   </span>
                 </div>
-
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 bg-error rounded-full"></div>
@@ -582,7 +567,6 @@ export default function AppointmentsPage() {
               </div>
             </CardContent>
           </Card>
-
           {/* Quick Actions */}
           <Card>
             <CardHeader>
@@ -597,14 +581,12 @@ export default function AppointmentsPage() {
                   Novo Agendamento
                 </Link>
               </Button>
-
               <Button variant="secondary" className="w-full" asChild>
                 <Link href="/dashboard/pets" className="flex items-center justify-center">
                   <Heart className="w-4 h-4 mr-2" />
                   Ver Pets
                 </Link>
               </Button>
-
               <Button variant="secondary" className="w-full" asChild>
                 <Link href="/dashboard/guardians" className="flex items-center justify-center">
                   <User className="w-4 h-4 mr-2" />
@@ -613,7 +595,6 @@ export default function AppointmentsPage() {
               </Button>
             </CardContent>
           </Card>
-
           {/* Upcoming Appointments */}
           <Card>
             <CardHeader>
@@ -640,7 +621,7 @@ export default function AppointmentsPage() {
                         </p>
                         <p className="text-xs text-text-secondary">
                           {format(parseISO(appointment.dateTime), "dd/MM HH:mm")} •{" "}
-                          {appointment.guardian.name}
+                          {appointment.guardian.fullName}
                         </p>
                       </div>
                     </div>

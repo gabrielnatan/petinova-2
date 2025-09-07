@@ -2,20 +2,16 @@
 
 import React, { useState, useEffect, use } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
-// import { undefined as any, type any } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import Link from "next/link";
-
-interface Guardian {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-}
+import { petSchema, type PetFormData } from "@/lib/validations/pet";
+import { petAPI } from "@/lib/api/pets";
+import { guardianAPI, type Guardian } from "@/lib/api/guardians";
 
 
 export default function EditPetPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,56 +27,39 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<any>({
-    // resolver: zodResolver(undefined as any),
+  } = useForm<PetFormData>({
+    resolver: zodResolver(petSchema),
   });
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("accessToken");
-        
         // Fetch pet data and guardians in parallel
         const [petResponse, guardiansResponse] = await Promise.all([
-          fetch(`/api/pets/${resolvedParams.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("/api/guardians", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          petAPI.getPet(resolvedParams.id),
+          guardianAPI.getGuardians({ limit: 100 })
         ]);
 
-        if (petResponse.ok) {
-          const petData = await petResponse.json();
-          const pet = petData.pet;
-          
-          // Reset form with pet data
-          reset({
-            name: pet.name,
-            species: pet.species,
-            breed: pet.breed || "",
-            size: pet.size || "",
-            weight: pet.weight || 0,
-            isNeutered: pet.isNeutered,
-            environment: pet.environment || "",
-            birthDate: pet.birthDate ? new Date(pet.birthDate) : undefined,
-            notes: pet.notes || "",
-            coatType: "",
-            color: "",
-            proceduresPerformed: [],
-            preexistingConditions: [],
-            restrictions: [],
-            guardian_id: pet.guardian_id,
-          });
-        }
+        const pet = petResponse.pet;
+        
+        // Reset form with pet data
+        reset({
+          name: pet.name,
+          species: pet.species,
+          breed: pet.breed || "",
+          size: pet.size || "",
+          weight: pet.weight || undefined,
+          isNeutered: pet.isNeutered,
+          environment: pet.environment || "",
+          birthDate: pet.birthDate ? pet.birthDate.split('T')[0] : "",
+          notes: pet.notes || "",
+          guardian_id: pet.guardian_id,
+        });
 
-        if (guardiansResponse.ok) {
-          const guardiansData = await guardiansResponse.json();
-          setGuardians(guardiansData.guardians);
-        }
+        setGuardians(guardiansResponse.guardians);
       } catch (error) {
         console.error("Error fetching data:", error);
-        setSubmitError("Erro ao carregar dados");
+        setSubmitError("Erro ao carregar dados do pet");
       } finally {
         setLoadingPet(false);
         setLoadingGuardians(false);
@@ -90,39 +69,26 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
     fetchData();
   }, [resolvedParams.id, reset]);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: PetFormData) => {
     setSubmitError(null);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await fetch(`/api/pets/${resolvedParams.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: data.name,
-          species: data.species,
-          breed: data.breed,
-          size: data.size,
-          weight: data.weight,
-          isNeutered: data.isNeutered,
-          environment: data.environment,
-          birthDate: data.birthDate?.toISOString(),
-          notes: data.notes,
-          guardianId: data.guardian_id,
-        }),
+      await petAPI.updatePet(resolvedParams.id, {
+        name: data.name,
+        species: data.species,
+        breed: data.breed || undefined,
+        size: data.size || undefined,
+        weight: data.weight || undefined,
+        isNeutered: data.isNeutered,
+        environment: data.environment || undefined,
+        birthDate: data.birthDate || undefined,
+        notes: data.notes || undefined,
+        guardian_id: data.guardian_id,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao atualizar pet");
-      }
 
       router.push(`/dashboard/pets/${resolvedParams.id}`);
     } catch (error) {
       console.error("Error updating pet:", error);
-      setSubmitError(error instanceof Error ? error.message : "Erro desconhecido");
+      setSubmitError(error instanceof Error ? error.message : "Erro ao atualizar pet");
     }
   };
 
@@ -165,7 +131,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
               <Input
                 label="Nome do Pet"
                 {...register("name")}
-                error={undefined}
+                error={errors.name?.message}
                 placeholder="Ex: Buddy"
               />
 
@@ -187,7 +153,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.species && (
                   <p className="text-sm text-error mt-1">
-                    {errors.species?.message as string}
+                    {errors.species.message}
                   </p>
                 )}
               </div>
@@ -197,7 +163,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
               <Input
                 label="Raça"
                 {...register("breed")}
-                error={undefined}
+                error={errors.name?.message}
                 placeholder="Ex: Golden Retriever"
               />
 
@@ -216,7 +182,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.size && (
                   <p className="text-sm text-error mt-1">
-                    {errors.size?.message as string}
+                    {errors.size.message}
                   </p>
                 )}
               </div>
@@ -228,15 +194,15 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 type="number"
                 step="0.1"
                 {...register("weight", { valueAsNumber: true })}
-                error={undefined}
+                error={errors.name?.message}
                 placeholder="Ex: 15.5"
               />
 
               <Input
                 label="Data de Nascimento"
                 type="date"
-                {...register("birthDate", { valueAsDate: true })}
-                error={undefined}
+                {...register("birthDate")}
+                error={errors.name?.message}
               />
 
               <div>
@@ -255,7 +221,7 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                 </select>
                 {errors.environment && (
                   <p className="text-sm text-error mt-1">
-                    {errors.environment?.message as string}
+                    {errors.environment.message}
                   </p>
                 )}
               </div>
@@ -307,14 +273,14 @@ export default function EditPetPage({ params }: { params: Promise<{ id: string }
                   {loadingGuardians ? "Carregando..." : "Selecione o tutor"}
                 </option>
                 {guardians.map((guardian) => (
-                  <option key={guardian.id} value={guardian.id}>
-                    {guardian.name} - {guardian.phone || guardian.email}
+                  <option key={guardian.guardian_id} value={guardian.guardian_id}>
+                    {guardian.fullName} - {guardian.phone || guardian.email}
                   </option>
                 ))}
               </select>
               {errors.guardian_id && (
                 <p className="text-sm text-error mt-1">
-                  {/* errors.guardian_id.message */`Error in guardian_id`}
+                  {errors.guardian_id.message}
                 </p>
               )}
               {guardians.length === 0 && !loadingGuardians && (

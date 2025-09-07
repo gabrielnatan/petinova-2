@@ -1,7 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,159 +16,151 @@ import {
   Heart,
   Calendar,
   Shield,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import {  formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-
+import { useParams, useRouter } from "next/navigation";
+import { guardianAPI, type Guardian } from "@/lib/api/guardians";
+import { useAuth } from "@/store";
 // Schema de validação
 const editGuardianSchema = z.object({
-  fullName: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
-  cpf: z.string().min(11, "CPF deve ter 11 dígitos").max(14, "CPF inválido"),
-  rg: z.string().min(1, "RG é obrigatório"),
+  name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
   email: z.string().email("Email inválido"),
-  phone: z.string().min(10, "Telefone deve ter pelo menos 10 dígitos"),
-  address: z.string().min(10, "Endereço deve ter pelo menos 10 caracteres"),
-  birthDate: z.date().optional(),
-  gender: z.enum(["Male", "Female", "Other", "Unknown"]),
+  phone: z.string().optional(),
+  address: z.string().optional(),
 });
-
 type EditGuardianFormData = z.infer<typeof editGuardianSchema>;
-
-// Mock data - replace with actual data fetching
-const mockGuardian = {
-  guardian_id: "1",
-  fullName: "João Silva",
-  cpf: "12345678901",
-  rg: "123456789",
-  email: "joao@email.com",
-  phone: "11999999999",
-  address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-  birthDate: new Date("1985-03-15"),
-  gender: "Male",
-  avatarUrl: null,
-  created_at: new Date("2024-01-15"),
-  updated_at: new Date("2024-12-20"),
-
-  pets: [
-    {
-      pet_id: "1",
-      name: "Buddy",
-      species: "Cão",
-      breed: "Golden Retriever",
-      age: "4 anos",
-      lastVisit: new Date("2024-12-20"),
-      nextAppointment: new Date("2025-02-15"),
-    },
-    {
-      pet_id: "2",
-      name: "Rex",
-      species: "Cão",
-      breed: "Pastor Alemão",
-      age: "2 anos",
-      lastVisit: new Date("2024-11-15"),
-      nextAppointment: null,
-    },
-  ],
-
-  stats: {
-    totalAppointments: 8,
-    totalConsultations: 6,
-    totalSpent: 1250.0,
-    lastVisit: new Date("2024-12-20"),
-    clientSince: new Date("2024-01-15"),
-  },
-};
-
 export default function EditGuardianPage() {
+  const [guardian, setGuardian] = useState<Guardian | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const params = useParams();
-  const appointmentId = params?.id as string;
+  const router = useRouter();
+  const { isAuthenticated, checkAuth } = useAuth();
+  const guardianId = params?.id as string;
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<EditGuardianFormData>({
     resolver: zodResolver(editGuardianSchema),
-    defaultValues: {
-      fullName: mockGuardian.fullName,
-      cpf: mockGuardian.cpf,
-      rg: mockGuardian.rg,
-      email: mockGuardian.email,
-      phone: mockGuardian.phone,
-      address: mockGuardian.address,
-      birthDate: mockGuardian.birthDate,
-      gender: mockGuardian.gender as any,
-    },
   });
-
+  // Verificar autenticação
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkAuth();
+    };
+    initAuth();
+  }, [checkAuth]);
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/auth/login');
+      return;
+    }
+  }, [isAuthenticated, router, loading]);
+  // Buscar dados do tutor
+  useEffect(() => {
+    if (!isAuthenticated || !guardianId) return;
+    const fetchGuardian = async () => {
+      try {
+        setLoading(true);
+        const response = await guardianAPI.getGuardian(guardianId);
+        setGuardian(response.guardian);
+        // Preencher o formulário com os dados atuais
+        reset({
+          name: response.guardian.fullName,
+          email: response.guardian.email,
+          phone: response.guardian.phone || '',
+          address: response.guardian.address || '',
+        });
+      } catch (error) {
+        console.error("Error fetching guardian:", error);
+        setError("Erro ao carregar dados do tutor");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGuardian();
+  }, [isAuthenticated, guardianId, reset]);
   const onSubmit = async (data: EditGuardianFormData) => {
     try {
-      console.log("Updating guardian:", { id: appointmentId, ...data });
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // Redirect to guardian profile
-      window.location.href = `/dashboard/guardians/${appointmentId}`;
+      await guardianAPI.updateGuardian(guardianId, data);
+      router.push(`/dashboard/guardians/${guardianId}`);
     } catch (error) {
       console.error("Error updating guardian:", error);
+      setError("Erro ao atualizar tutor");
     }
   };
-
   const handleDelete = async () => {
     try {
-      console.log("Deleting guardian:", appointmentId);
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Redirect to guardians list
-      window.location.href = "/dashboard/guardians";
+      await guardianAPI.deleteGuardian(guardianId);
+      router.push("/dashboard/guardians");
     } catch (error) {
       console.error("Error deleting guardian:", error);
+      setError("Erro ao excluir tutor");
     }
   };
-
   const handleDeactivate = async () => {
-    try {
-      setIsDeactivating(true);
-      console.log("Deactivating guardian:", appointmentId);
-
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setIsDeactivating(false);
-      // Mostrar toast de sucesso
-    } catch (error) {
-      console.error("Error deactivating guardian:", error);
-      setIsDeactivating(false);
-    }
+    // Funcionalidade de desativação não implementada na API
+    setError("Funcionalidade de desativação ainda não disponível");
   };
-
   const formatCPFInput = (value: string) => {
     return value
       .replace(/\D/g, "")
       .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
   };
-
   const formatPhoneInput = (value: string) => {
     return value
       .replace(/\D/g, "")
       .replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
   };
-
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Carregando dados do tutor...</span>
+        </div>
+      </div>
+    );
+  }
+  if (error || !guardian) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="flex items-center space-x-4 mb-6">
+          <Button variant="ghost" asChild>
+            <Link href="/dashboard/guardians" className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
+        <Card className="border-error">
+          <CardContent className="p-6 text-center">
+            <p className="text-error">{error || "Tutor não encontrado"}</p>
+            <Button className="mt-4" asChild>
+              <Link href="/dashboard/guardians">Voltar para lista</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" asChild>
-            <Link href={`/dashboard/guardians/${appointmentId}`} className="flex items-center">
+            <Link href={`/dashboard/guardians/${guardianId}`} className="flex items-center">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Voltar
             </Link>
@@ -180,12 +170,11 @@ export default function EditGuardianPage() {
               Editar Tutor
             </h1>
             <p className="text-text-secondary">
-              {mockGuardian.fullName} • Última atualização:{" "}
-              {formatDate(mockGuardian.updated_at)}
+              {guardian.fullName} • Última atualização:{" "}
+              {formatDate(guardian.updated_at)}
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button
             variant="ghost"
@@ -196,7 +185,6 @@ export default function EditGuardianPage() {
             <Shield className="w-4 h-4 mr-2" />
             {isDeactivating ? "Desativando..." : "Desativar"}
           </Button>
-
           <Button
             variant="ghost"
             className="text-error hover:bg-error/10"
@@ -207,8 +195,15 @@ export default function EditGuardianPage() {
           </Button>
         </div>
       </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Error Display */}
+        {error && (
+          <Card className="border-error">
+            <CardContent className="p-4">
+              <p className="text-error text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Form */}
           <div className="lg:col-span-2 space-y-6">
@@ -221,64 +216,15 @@ export default function EditGuardianPage() {
                 </h2>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="Nome Completo"
-                    {...register("fullName")}
-                    error={errors.fullName?.message}
-                    placeholder="Ex: João Silva"
-                    icon={User}
-                  />
-
-                  <Input
-                    label="CPF"
-                    {...register("cpf")}
-                    error={errors.cpf?.message}
-                    placeholder="000.000.000-00"
-                    onChange={(e) => {
-                      e.target.value = formatCPFInput(e.target.value);
-                    }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    label="RG"
-                    {...register("rg")}
-                    error={errors.rg?.message}
-                    placeholder="Ex: 12.345.678-9"
-                  />
-
-                  <div>
-                    <label className="block text-sm font-medium text-text-primary mb-2">
-                      Gênero
-                    </label>
-                    <select
-                      {...register("gender")}
-                      className="bg-surface border border-border rounded-md px-3 py-2 text-text-primary w-full focus:border-border-focus focus:outline-none"
-                    >
-                      <option value="Male">Masculino</option>
-                      <option value="Female">Feminino</option>
-                      <option value="Other">Outro</option>
-                      <option value="Unknown">Prefiro não informar</option>
-                    </select>
-                    {errors.gender && (
-                      <p className="text-sm text-error mt-1">
-                        {errors.gender.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
                 <Input
-                  label="Data de Nascimento"
-                  type="date"
-                  {...register("birthDate", { valueAsDate: true })}
-                  error={errors.birthDate?.message}
+                  label="Nome Completo"
+                  {...register("name")}
+                  error={errors.name?.message}
+                  placeholder="Ex: João Silva"
+                  icon={User}
                 />
               </CardContent>
             </Card>
-
             {/* Contact Information */}
             <Card>
               <CardHeader>
@@ -297,7 +243,6 @@ export default function EditGuardianPage() {
                     placeholder="exemplo@email.com"
                     icon={Mail}
                   />
-
                   <Input
                     label="Telefone"
                     {...register("phone")}
@@ -309,7 +254,6 @@ export default function EditGuardianPage() {
                     }}
                   />
                 </div>
-
                 <Input
                   label="Endereço Completo"
                   {...register("address")}
@@ -319,28 +263,25 @@ export default function EditGuardianPage() {
                 />
               </CardContent>
             </Card>
-
             {/* Associated Pets */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-text-primary flex items-center">
                     <Heart className="w-5 h-5 mr-2" />
-                    Pets Associados ({mockGuardian.pets.length})
+                    Pets Associados ({guardian.pets?.length || 0})
                   </h2>
                   <Button variant="secondary" size="sm" asChild>
-                    <Link href="/dashboard/pets/new" className="flex items-center justify-center">Adicionar Pet</Link>
+                    <Link href={`/dashboard/pets/new?guardian=${guardianId}`} className="flex items-center justify-center">Adicionar Pet</Link>
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {mockGuardian.pets.map((pet) => (
-                    <motion.div
+                  {guardian.pets && guardian.pets.length > 0 ? guardian.pets.map((pet) => (
+                    <div
                       key={pet.pet_id}
                       className="flex items-center justify-between p-4 bg-background-secondary rounded-lg"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
                     >
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
@@ -352,14 +293,6 @@ export default function EditGuardianPage() {
                           </h4>
                           <p className="text-sm text-text-secondary">
                             {pet.breed} • {pet.species}
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            Última visita: {formatDate(pet.lastVisit)}
-                            {pet.nextAppointment && (
-                              <span className="ml-2">
-                                • Próximo: {formatDate(pet.nextAppointment)}
-                              </span>
-                            )}
                           </p>
                         </div>
                       </div>
@@ -375,13 +308,16 @@ export default function EditGuardianPage() {
                           </Link>
                         </Button>
                       </div>
-                    </motion.div>
-                  ))}
+                    </div>
+                  )) : (
+                    <p className="text-sm text-text-secondary text-center py-4">
+                      Nenhum pet cadastrado
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Actions */}
@@ -401,22 +337,18 @@ export default function EditGuardianPage() {
                   <Save className="w-4 h-4 mr-2" />
                   {isSubmitting ? "Salvando..." : "Salvar Alterações"}
                 </Button>
-
                 <Button variant="secondary" className="w-full" asChild>
-                  <Link href={`/dashboard/guardians/${appointmentId}`} className="flex items-center justify-center">
+                  <Link href={`/dashboard/guardians/${guardianId}`} className="flex items-center justify-center">
                     Cancelar Edição
                   </Link>
                 </Button>
-
                 <hr className="border-border" />
-
                 <Button variant="secondary" className="w-full" asChild>
                   <Link href="/dashboard/appointments/new" className="flex items-center justify-center">
                     <Calendar className="w-4 h-4 mr-2" />
                     Agendar Consulta
                   </Link>
                 </Button>
-
                 <Button variant="secondary" className="w-full">
                   <Link href="/dashboard/pets/new">
                     <Heart className="w-4 h-4 mr-2" />
@@ -425,7 +357,6 @@ export default function EditGuardianPage() {
                 </Button>
               </CardContent>
             </Card>
-
             {/* Statistics */}
             <Card>
               <CardHeader>
@@ -436,53 +367,28 @@ export default function EditGuardianPage() {
               <CardContent className="space-y-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary-500 mb-1">
-                    {mockGuardian.pets.length}
+                    {guardian.petsCount || guardian.pets?.length || 0}
                   </div>
                   <div className="text-sm text-text-secondary">
                     Pets Cadastrados
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-text-primary">
-                      {mockGuardian.stats.totalAppointments}
-                    </div>
-                    <div className="text-xs text-text-secondary">
-                      Agendamentos
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold text-text-primary">
-                      {mockGuardian.stats.totalConsultations}
-                    </div>
-                    <div className="text-xs text-text-secondary">Consultas</div>
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Cliente desde:</span>
                     <span className="text-text-primary">
-                      {formatDate(mockGuardian.stats.clientSince)}
+                      {formatDate(guardian.created_at)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">Última visita:</span>
+                    <span className="text-text-secondary">Última atualização:</span>
                     <span className="text-text-primary">
-                      {formatDate(mockGuardian.stats.lastVisit)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">Total gasto:</span>
-                    <span className="text-text-primary font-medium">
-                      R$ {mockGuardian.stats.totalSpent.toFixed(2)}
+                      {formatDate(guardian.updated_at)}
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
             {/* Warning Card */}
             <Card className="border-warning/20 bg-warning/5">
               <CardHeader>
@@ -493,11 +399,10 @@ export default function EditGuardianPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-warning/80">
-                  Este tutor possui {mockGuardian.pets.length} pet
-                  {mockGuardian.pets.length !== 1 ? "s" : ""} cadastrado
-                  {mockGuardian.pets.length !== 1 ? "s" : ""}.
+                  Este tutor possui {guardian.pets?.length || 0} pet
+                  {(guardian.pets?.length || 0) !== 1 ? "s" : ""} cadastrado
+                  {(guardian.pets?.length || 0) !== 1 ? "s" : ""}.
                 </p>
-
                 <div className="space-y-2">
                   <Button
                     variant="ghost"
@@ -508,7 +413,6 @@ export default function EditGuardianPage() {
                     <Shield className="w-4 h-4 mr-2" />
                     Desativar Tutor
                   </Button>
-
                   <p className="text-xs text-warning/60">
                     Desativar irá manter os dados mas impedir novos
                     agendamentos.
@@ -516,7 +420,6 @@ export default function EditGuardianPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Information */}
             <Card>
               <CardHeader>
@@ -528,13 +431,13 @@ export default function EditGuardianPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">ID do Tutor:</span>
                   <span className="text-text-primary font-medium">
-                    #{appointmentId}
+                    #{guardianId}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Cadastrado em:</span>
                   <span className="text-text-primary">
-                    {formatDate(mockGuardian.created_at)}
+                    {formatDate(guardian.created_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -542,7 +445,7 @@ export default function EditGuardianPage() {
                     Última atualização:
                   </span>
                   <span className="text-text-primary">
-                    {formatDate(mockGuardian.updated_at)}
+                    {formatDate(guardian.updated_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -554,18 +457,13 @@ export default function EditGuardianPage() {
           </div>
         </div>
       </form>
-
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+        <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
           onClick={() => setShowDeleteConfirm(false)}
         >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+          <div
             className="bg-surface rounded-lg p-6 w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
@@ -582,12 +480,10 @@ export default function EditGuardianPage() {
                 </p>
               </div>
             </div>
-
             <div className="mb-6">
               <p className="text-text-secondary mb-4">
                 Tem certeza que deseja excluir permanentemente este tutor?
               </p>
-
               <div className="bg-error/10 border border-error/20 rounded-lg p-4">
                 <h4 className="font-medium text-error mb-2">
                   ⚠️ Consequências da exclusão:
@@ -595,31 +491,16 @@ export default function EditGuardianPage() {
                 <ul className="text-sm text-error/80 space-y-1">
                   <li>• Todos os dados do tutor serão perdidos</li>
                   <li>
-                    • {mockGuardian.pets.length} pet
-                    {mockGuardian.pets.length !== 1 ? "s" : ""} precisará
-                    {mockGuardian.pets.length !== 1 ? "ão" : ""} de novo tutor
+                    • {guardian.pets?.length || 0} pet
+                    {(guardian.pets?.length || 0) !== 1 ? "s" : ""} precisará
+                    {(guardian.pets?.length || 0) !== 1 ? "ão" : ""} de novo tutor
                   </li>
                   <li>
-                    • Histórico de {mockGuardian.stats.totalConsultations}{" "}
-                    consulta
-                    {mockGuardian.stats.totalConsultations !== 1
-                      ? "s"
-                      : ""}{" "}
-                    será mantido
-                  </li>
-                  <li>
-                    • {mockGuardian.stats.totalAppointments} agendamento
-                    {mockGuardian.stats.totalAppointments !== 1 ? "s" : ""} será
-                    {mockGuardian.stats.totalAppointments !== 1
-                      ? "ão"
-                      : ""}{" "}
-                    cancelado
-                    {mockGuardian.stats.totalAppointments !== 1 ? "s" : ""}
+                    • Histórico será mantido mas dissociado do tutor
                   </li>
                 </ul>
               </div>
             </div>
-
             <div className="flex justify-end space-x-3">
               <Button
                 variant="secondary"
@@ -636,8 +517,8 @@ export default function EditGuardianPage() {
                 Excluir Permanentemente
               </Button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

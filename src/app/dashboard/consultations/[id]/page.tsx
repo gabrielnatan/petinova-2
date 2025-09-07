@@ -1,7 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Edit,
@@ -28,117 +26,107 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDateTime, formatPhone, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-
-// Mock data - replace with actual data fetching
-const mockConsultation = {
-  consultation_id: "1",
-  description:
-    "Consulta de rotina com exame físico completo, aferição de peso e temperatura. Aplicação de vacina V10 e orientações sobre alimentação. Pet apresentou comportamento normal e sinais vitais estáveis.",
-  amount: 150.0,
-  payment_method: "credit_card",
-  payment_plan: 1,
-  paid: true,
-  created_at: new Date(2025, 0, 28, 9, 30),
-  updated_at: new Date(2025, 0, 28, 10, 15),
-
-  appointment: {
-    appointment_id: "1",
-    dateTime: new Date(2025, 0, 28, 9, 0),
-    status: "completed",
-    notes: "Consulta de rotina - Verificação geral",
-  },
-
-  pet: {
-    pet_id: "1",
-    name: "Buddy",
-    species: "Cão",
-    breed: "Golden Retriever",
-    age: "4 anos",
-    weight: 30,
-    color: "Dourado",
-    isNeutered: true,
-    avatarUrl: null,
-  },
-
-  guardian: {
-    guardian_id: "1",
-    fullName: "João Silva",
-    phone: "11999999999",
-    email: "joao.silva@email.com",
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-  },
-
-  veterinarian: {
-    veterinarian_id: "1",
-    fullName: "Dra. Maria Santos",
-    specialty: "Clínica Geral",
-    crmv: "12345/SP",
-    phone: "11888888888",
-  },
-
-  clinic: {
-    clinic_id: "1",
-    tradeName: "Clínica São Bento",
-    address: "Av. Paulista, 456 - Bela Vista, São Paulo - SP",
-    phone: "1133334444",
-  },
-
-  prescription: {
-    prescription_id: "1",
-    text: "RECEITUÁRIO VETERINÁRIO\n\nPara: Buddy (Cão, Golden Retriever)\nTutor: João Silva\n\nPrescrição:\n- Ração Premium para cães adultos grandes - 2x ao dia\n- Suplemento vitamínico: 1 comprimido ao dia por 30 dias\n- Retorno em 6 meses para check-up\n\nObservações:\n- Manter peso atual\n- Exercícios regulares\n- Evitar alimentos industrializados para humanos",
-    created_at: new Date(2025, 0, 28, 10, 0),
-  },
-};
-
-const paymentMethodConfig = {
-  cash: {
-    label: "Dinheiro",
-    icon: DollarSign,
-  },
-  debit_card: {
-    label: "Cartão de Débito",
-    icon: CreditCard,
-  },
-  credit_card: {
-    label: "Cartão de Crédito",
-    icon: CreditCard,
-  },
-  pix: {
-    label: "PIX",
-    icon: DollarSign,
-  },
-  bank_transfer: {
-    label: "Transferência",
-    icon: DollarSign,
-  },
-  insurance: {
-    label: "Plano de Saúde",
-    icon: Receipt,
-  },
-};
+import { useParams, useRouter } from "next/navigation";
+import { consultationAPI, type Consultation } from "@/lib/api/consultations";
+import { useAuth } from "@/store";
 
 export default function ConsultationDetailPage() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const [consultation, setConsultation] = useState<Consultation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "details" | "prescription" | "history"
   >("details");
   const [showActions, setShowActions] = useState(false);
+  
   const params = useParams();
-  const appointmentId = params?.id as string;
-  const paymentMethod =
-    paymentMethodConfig[
-      mockConsultation.payment_method as keyof typeof paymentMethodConfig
-    ];
+  const consultationId = params?.id as string;
 
+  // Carregar dados da consulta
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    const loadConsultation = async () => {
+      try {
+        setLoading(true);
+        const response = await consultationAPI.getConsultation(consultationId);
+        setConsultation(response.consultation);
+      } catch (error) {
+        console.error('Error loading consultation:', error);
+        setError(error instanceof Error ? error.message : 'Erro ao carregar consulta');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadConsultation();
+  }, [consultationId, isAuthenticated]);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth/login');
+    }
+  }, [isAuthenticated, router]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span>Carregando consulta...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            Erro ao carregar consulta
+          </h2>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found state
+  if (!consultation) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-text-primary mb-2">
+            Consulta não encontrada
+          </h2>
+          <p className="text-text-secondary mb-4">
+            A consulta que você está procurando não existe.
+          </p>
+          <Button asChild>
+            <Link href="/dashboard/consultations">
+              Voltar para Consultas
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
   const handlePrintConsultation = () => {
     console.log("Printing consultation...");
     window.print();
   };
-
   const handleDownloadPDF = () => {
     console.log("Downloading PDF...");
   };
-
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -152,25 +140,22 @@ export default function ConsultationDetailPage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-text-primary">
-              Consulta #{appointmentId}
+              Consulta #{consultationId}
             </h1>
             <p className="text-text-secondary">
-              Realizada em {formatDateTime(mockConsultation.created_at)}
+              Realizada em {formatDateTime(consultation.created_at)}
             </p>
           </div>
         </div>
-
         <div className="flex items-center space-x-2">
           <Button variant="secondary" onClick={handlePrintConsultation}>
             <Printer className="w-4 h-4 mr-2" />
             Imprimir
           </Button>
-
           <Button variant="secondary" onClick={handleDownloadPDF}>
             <Download className="w-4 h-4 mr-2" />
             PDF
           </Button>
-
           <div className="relative">
             <Button
               variant="secondary"
@@ -178,23 +163,19 @@ export default function ConsultationDetailPage() {
             >
               <MoreVertical className="w-4 h-4" />
             </Button>
-
             {showActions && (
-              <motion.div
+              <div
                 className="absolute right-0 top-full mt-2 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[200px]"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
               >
                 <Link
-                  href={`/dashboard/consultations/${appointmentId}/edit`}
+                  href={`/dashboard/consultations/${consultationId}/edit`}
                   className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Editar Consulta
                 </Link>
                 <Link
-                  href={`/dashboard/consultations/${appointmentId}/prescription`}
+                  href={`/dashboard/consultations/${consultationId}/prescription`}
                   className="flex items-center px-3 py-2 text-sm text-text-primary hover:bg-background-secondary"
                 >
                   <Pill className="w-4 h-4 mr-2" />
@@ -207,49 +188,17 @@ export default function ConsultationDetailPage() {
                   <Printer className="w-4 h-4 mr-2" />
                   Imprimir Receita
                 </button>
-              </motion.div>
+              </div>
             )}
           </div>
-
           <Button asChild>
-            <Link href={`/dashboard/consultations/${appointmentId}/edit`} className="flex items-center">
+            <Link href={`/dashboard/consultations/${consultationId}/edit`} className="flex items-center">
               <Edit className="w-4 h-4 mr-2" />
               Editar
             </Link>
           </Button>
         </div>
       </div>
-
-      {/* Status Banner */}
-      <motion.div
-        className={`${mockConsultation.paid ? "bg-success text-success-foreground" : "bg-warning text-warning-foreground"} rounded-lg p-4 mb-6 flex items-center justify-between`}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <div className="flex items-center space-x-3">
-          {mockConsultation.paid ? (
-            <CheckCircle className="w-6 h-6" />
-          ) : (
-            <XCircle className="w-6 h-6" />
-          )}
-          <div>
-            <div className="font-semibold text-lg">
-              {mockConsultation.paid ? "Consulta Paga" : "Pagamento Pendente"}
-            </div>
-            <div className="text-sm opacity-90">
-              {mockConsultation.paid
-                ? "Pagamento confirmado e consulta finalizada"
-                : "Aguardando confirmação do pagamento"}
-            </div>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-sm opacity-75">Valor Total</div>
-          <div className="font-bold text-xl">
-            {formatCurrency(mockConsultation.amount)}
-          </div>
-        </div>
-      </motion.div>
 
       {/* Tabs */}
       <div className="flex space-x-1 mb-6">
@@ -267,7 +216,6 @@ export default function ConsultationDetailPage() {
           </Button>
         ))}
       </div>
-
       {/* Content */}
       {activeTab === "details" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -290,11 +238,10 @@ export default function ConsultationDetailPage() {
                     <div className="flex items-center space-x-2 mt-1">
                       <Calendar className="w-4 h-4 text-text-tertiary" />
                       <span className="text-text-primary font-medium">
-                        {formatDateTime(mockConsultation.appointment.dateTime)}
+                        {formatDateTime(consultation.date)}
                       </span>
                     </div>
                   </div>
-
                   <div>
                     <label className="text-sm font-medium text-text-secondary">
                       Duração
@@ -307,31 +254,28 @@ export default function ConsultationDetailPage() {
                     </div>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-text-secondary">
                     Descrição da Consulta
                   </label>
                   <div className="mt-1 p-4 bg-background-secondary rounded-md">
                     <p className="text-text-primary whitespace-pre-line">
-                      {mockConsultation.description}
+                      {consultation.diagnosis || 'Nenhum diagnóstico registrado'}
                     </p>
                   </div>
                 </div>
-
                 <div>
                   <label className="text-sm font-medium text-text-secondary">
                     Observações do Agendamento
                   </label>
                   <div className="mt-1 p-3 bg-background-secondary rounded-md">
                     <p className="text-text-primary">
-                      {mockConsultation.appointment.notes}
+                      {consultation.notes || 'Nenhuma observação registrada'}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
             {/* Pet Information */}
             <Card>
               <CardHeader>
@@ -347,38 +291,32 @@ export default function ConsultationDetailPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-text-primary mb-2">
-                      {mockConsultation.pet.name}
+                      {consultation.pet.name}
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <span className="text-text-secondary">Espécie:</span>
                         <div className="font-medium text-text-primary">
-                          {mockConsultation.pet.species}
+                          {consultation.pet.species}
                         </div>
                       </div>
                       <div>
                         <span className="text-text-secondary">Raça:</span>
                         <div className="font-medium text-text-primary">
-                          {mockConsultation.pet.breed}
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-text-secondary">Idade:</span>
-                        <div className="font-medium text-text-primary">
-                          {mockConsultation.pet.age}
+                          {consultation.pet.breed || 'Não informado'}
                         </div>
                       </div>
                       <div>
                         <span className="text-text-secondary">Peso:</span>
                         <div className="font-medium text-text-primary">
-                          {mockConsultation.pet.weight}kg
+                          {consultation.pet.weight ? `${consultation.pet.weight}kg` : 'Não informado'}
                         </div>
                       </div>
                     </div>
                   </div>
                   <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/pets/${mockConsultation.pet.pet_id}`} className="flex items-center"
+                      href={`/dashboard/pets/${consultation.pet.id}`} className="flex items-center"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Ver Perfil
@@ -387,7 +325,6 @@ export default function ConsultationDetailPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Guardian Information */}
             <Card>
               <CardHeader>
@@ -403,32 +340,26 @@ export default function ConsultationDetailPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-text-primary mb-3">
-                      {mockConsultation.guardian.fullName}
+                      {consultation.guardian.name}
                     </h3>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2 text-sm">
                         <Phone className="w-4 h-4 text-text-tertiary" />
                         <span className="text-text-primary">
-                          {formatPhone(mockConsultation.guardian.phone)}
+                          {formatPhone(consultation.guardian.phone)}
                         </span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm">
                         <Mail className="w-4 h-4 text-text-tertiary" />
                         <span className="text-text-primary">
-                          {mockConsultation.guardian.email}
-                        </span>
-                      </div>
-                      <div className="flex items-start space-x-2 text-sm">
-                        <MapPin className="w-4 h-4 text-text-tertiary mt-0.5" />
-                        <span className="text-text-primary">
-                          {mockConsultation.guardian.address}
+                          {consultation.guardian.email}
                         </span>
                       </div>
                     </div>
                   </div>
                   <Button variant="secondary" size="sm" asChild>
                     <Link
-                      href={`/dashboard/guardians/${mockConsultation.guardian.guardian_id}`} className="flex items-center"
+                      href={`/dashboard/guardians/${consultation.guardian.id}`} className="flex items-center"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       Ver Perfil
@@ -438,64 +369,9 @@ export default function ConsultationDetailPage() {
               </CardContent>
             </Card>
           </div>
-
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Payment Information */}
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold text-text-primary flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Pagamento
-                </h3>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-primary-500 mb-2">
-                    {formatCurrency(mockConsultation.amount)}
-                  </div>
-                  <div
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      mockConsultation.paid
-                        ? "bg-success text-success-foreground"
-                        : "bg-warning text-warning-foreground"
-                    }`}
-                  >
-                    {mockConsultation.paid ? "Pago" : "Pendente"}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">Método:</span>
-                    <div className="flex items-center space-x-1">
-                      <paymentMethod.icon className="w-4 h-4" />
-                      <span className="text-text-primary font-medium">
-                        {paymentMethod.label}
-                      </span>
-                    </div>
-                  </div>
-
-                  {mockConsultation.payment_plan > 1 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">Parcelamento:</span>
-                      <span className="text-text-primary font-medium">
-                        {mockConsultation.payment_plan}x
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between text-sm">
-                    <span className="text-text-secondary">
-                      Data do Pagamento:
-                    </span>
-                    <span className="text-text-primary">
-                      {formatDateTime(mockConsultation.created_at)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Veterinarian Info */}
             <Card>
@@ -511,13 +387,13 @@ export default function ConsultationDetailPage() {
                     <Stethoscope className="w-10 h-10 text-accent-600" />
                   </div>
                   <h4 className="font-semibold text-text-primary mb-1">
-                    {mockConsultation.veterinarian.fullName}
+                    {consultation.veterinarian.name}
                   </h4>
                   <p className="text-sm text-text-secondary mb-2">
-                    {mockConsultation.veterinarian.specialty}
+                    {consultation.veterinarian.role}
                   </p>
                   <p className="text-xs text-text-tertiary mb-4">
-                    CRMV {mockConsultation.veterinarian.crmv}
+                    Veterinário responsável
                   </p>
                   <Button variant="secondary" size="sm" className="w-full">
                     Ver Agenda
@@ -525,7 +401,6 @@ export default function ConsultationDetailPage() {
                 </div>
               </CardContent>
             </Card>
-
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -536,18 +411,16 @@ export default function ConsultationDetailPage() {
               <CardContent className="space-y-3">
                 <Button variant="secondary" className="w-full" asChild>
                   <Link
-                    href={`/dashboard/consultations/${appointmentId}/prescription`} className="flex items-center"
+                    href={`/dashboard/consultations/${consultationId}/prescription`} className="flex items-center"
                   >
                     <Pill className="w-4 h-4 mr-2" />
                     Ver Receituário
                   </Link>
                 </Button>
-
                 <Button variant="secondary" className="w-full">
                   <Calendar className="w-4 h-4 mr-2" />
                   Agendar Retorno
                 </Button>
-
                 <Button
                   variant="secondary"
                   className="w-full"
@@ -558,7 +431,6 @@ export default function ConsultationDetailPage() {
                 </Button>
               </CardContent>
             </Card>
-
             {/* Information */}
             <Card>
               <CardHeader>
@@ -570,25 +442,25 @@ export default function ConsultationDetailPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">ID da Consulta:</span>
                   <span className="text-text-primary font-medium">
-                    #{appointmentId}
+                    #{consultation.consultation_id}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Agendamento:</span>
                   <span className="text-text-primary">
-                    #{mockConsultation.appointment.appointment_id}
+                    #{consultation.appointment.appointment_id}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Criada em:</span>
                   <span className="text-text-primary">
-                    {formatDateTime(mockConsultation.created_at)}
+                    {formatDateTime(consultation.created_at)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-text-secondary">Clínica:</span>
                   <span className="text-text-primary">
-                    {mockConsultation.clinic.tradeName}
+                    Clínica Petinova
                   </span>
                 </div>
               </CardContent>
@@ -596,7 +468,6 @@ export default function ConsultationDetailPage() {
           </div>
         </div>
       )}
-
       {/* Prescription Tab */}
       {activeTab === "prescription" && (
         <Card>
@@ -607,60 +478,32 @@ export default function ConsultationDetailPage() {
                 Receituário Médico Veterinário
               </h3>
               <div className="flex space-x-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handlePrintConsultation}
-                >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Imprimir
-                </Button>
                 <Button variant="secondary" size="sm" asChild>
                   <Link
-                    href={`/dashboard/consultations/${appointmentId}/prescription`} className="flex items-center"
+                    href={`/dashboard/consultations/${consultationId}/prescription`} className="flex items-center"
                   >
                     <Eye className="w-4 h-4 mr-2" />
-                    Ver Completo
+                    Ver Receituário Completo
                   </Link>
                 </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="bg-background-secondary rounded-lg p-6">
-              <div className="border-b border-border pb-4 mb-4">
-                <h4 className="font-semibold text-text-primary mb-2">
-                  {mockConsultation.clinic.tradeName}
-                </h4>
-                <p className="text-sm text-text-secondary">
-                  {mockConsultation.clinic.address}
-                </p>
-                <p className="text-sm text-text-secondary">
-                  Tel: {mockConsultation.clinic.phone}
-                </p>
-              </div>
-
-              <div className="whitespace-pre-line text-text-primary font-mono text-sm leading-relaxed">
-                {mockConsultation.prescription.text}
-              </div>
-
-              <div className="border-t border-border pt-4 mt-6">
-                <div className="flex justify-between text-sm text-text-secondary">
-                  <span>
-                    Emitido em:{" "}
-                    {formatDateTime(mockConsultation.prescription.created_at)}
-                  </span>
-                  <span>
-                    {mockConsultation.veterinarian.fullName} - CRMV{" "}
-                    {mockConsultation.veterinarian.crmv}
-                  </span>
-                </div>
-              </div>
+            <div className="text-center py-8">
+              <Pill className="w-12 h-12 text-text-tertiary mx-auto mb-4" />
+              <p className="text-text-secondary mb-4">
+                O receituário médico veterinário está disponível na página dedicada.
+              </p>
+              <Button asChild>
+                <Link href={`/dashboard/consultations/${consultationId}/prescription`}>
+                  Ver Receituário Completo
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
-
       {/* History Tab */}
       {activeTab === "history" && (
         <Card>
@@ -673,36 +516,21 @@ export default function ConsultationDetailPage() {
             <div className="space-y-4">
               {[
                 {
-                  date: new Date(2025, 0, 28, 10, 15),
-                  action: "Consulta finalizada",
-                  user: "Dra. Maria Santos",
-                  details: "Consulta concluída com prescrição médica",
+                  date: new Date(consultation.created_at),
+                  action: "Consulta criada",
+                  user: consultation.veterinarian.name,
+                  details: "Consulta médica veterinária registrada no sistema",
                 },
                 {
-                  date: new Date(2025, 0, 28, 10, 0),
-                  action: "Receituário emitido",
-                  user: "Dra. Maria Santos",
-                  details: "Prescrição médica gerada e anexada à consulta",
-                },
-                {
-                  date: new Date(2025, 0, 28, 9, 30),
-                  action: "Consulta iniciada",
-                  user: "Dra. Maria Santos",
-                  details: "Início do atendimento médico veterinário",
-                },
-                {
-                  date: new Date(2025, 0, 28, 9, 0),
-                  action: "Agendamento confirmado",
-                  user: "Recepção",
-                  details: "Cliente compareceu no horário agendado",
+                  date: new Date(consultation.updated_at),
+                  action: "Consulta atualizada",
+                  user: consultation.veterinarian.name,
+                  details: "Dados da consulta foram atualizados",
                 },
               ].map((event, index) => (
-                <motion.div
+                <div
                   key={index}
                   className="flex items-start space-x-4 p-4 bg-background-secondary rounded-lg"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
                 >
                   <div className="w-2 h-2 bg-primary-500 rounded-full mt-2" />
                   <div className="flex-1">
@@ -721,7 +549,7 @@ export default function ConsultationDetailPage() {
                       por {event.user}
                     </span>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
           </CardContent>

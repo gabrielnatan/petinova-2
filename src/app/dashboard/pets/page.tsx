@@ -1,7 +1,5 @@
 "use client";
-
 import React, { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -22,36 +20,28 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { petAPI, type Pet } from "@/lib/api/pets";
-
 function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }) {
   const [showMenu, setShowMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
   const getAgeText = (birthDate?: string) => {
     if (!birthDate) return 'Idade não informada';
-    
     const today = new Date();
     const birth = new Date(birthDate);
-    
     if (isNaN(birth.getTime())) {
       return 'Data inválida';
     }
-    
     const diffTime = Math.abs(today.getTime() - birth.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     const years = Math.floor(diffDays / 365);
     const months = Math.floor((diffDays % 365) / 30);
-
     if (years > 0) {
       return `${years} ano${years > 1 ? "s" : ""}`;
     } else {
       return `${months} mes${months > 1 ? "es" : ""}`;
     }
   };
-
   const handleDelete = async () => {
     if (!confirm("Tem certeza que deseja excluir este pet?")) return;
-    
     setIsDeleting(true);
     try {
       await petAPI.deletePet(pet.pet_id);
@@ -64,13 +54,8 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
       setIsDeleting(false);
     }
   };
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -5 }}
-      transition={{ duration: 0.2 }}
+    <div
     >
       <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer">
         <CardContent className="p-6">
@@ -86,7 +71,6 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
                 <p className="text-sm text-text-secondary">{pet.breed}</p>
               </div>
             </div>
-
             <div className="relative">
               <Button
                 variant="ghost"
@@ -96,13 +80,9 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
               >
                 <MoreVertical className="w-4 h-4" />
               </Button>
-
               {showMenu && (
-                <motion.div
+                <div
                   className="absolute right-0 top-full mt-1 bg-surface border border-border rounded-md shadow-lg z-10 min-w-[150px]"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
                 >
                   <Link
                     href={`/dashboard/pets/${pet.pet_id}`}
@@ -130,11 +110,10 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
                     )}
                     {isDeleting ? "Excluindo..." : "Excluir"}
                   </button>
-                </motion.div>
+                </div>
               )}
             </div>
           </div>
-
           <div className="space-y-2 mb-4">
             <div className="flex justify-between text-sm">
               <span className="text-text-secondary">Espécie:</span>
@@ -159,7 +138,6 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
               </span>
             </div>
           </div>
-
           <div className="border-t border-border pt-3">
             <div className="flex items-center space-x-2 text-sm text-text-secondary">
               <User className="w-4 h-4" />
@@ -168,10 +146,9 @@ function PetCard({ pet, onDelete }: { pet: Pet; onDelete: (id: string) => void }
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
-
 export default function PetsListPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [pets, setPets] = useState<Pet[]>([]);
@@ -184,8 +161,6 @@ export default function PetsListPage() {
     total: 0,
     pages: 0
   });
-  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
-
   const loadPets = useCallback(async (page = 1, search = "") => {
     try {
       setLoading(true);
@@ -204,33 +179,22 @@ export default function PetsListPage() {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     loadPets(1);
   }, [loadPets]);
-
   useEffect(() => {
-    if (searchDebounce) {
-      clearTimeout(searchDebounce);
-    }
-
     const timeout = setTimeout(() => {
       setCurrentPage(1);
       loadPets(1, searchTerm);
     }, 500);
-
-    setSearchDebounce(timeout);
-
     return () => {
       if (timeout) clearTimeout(timeout);
     };
   }, [searchTerm, loadPets]);
-
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     loadPets(page, searchTerm);
   };
-
   const handleDeletePet = (petId: string) => {
     setPets(prev => prev.filter(pet => pet.pet_id !== petId));
     // Atualizar stats
@@ -241,7 +205,6 @@ export default function PetsListPage() {
       }));
     }
   };
-
   // Calculate stats from current pets
   const stats = {
     total: pagination.total,
@@ -249,7 +212,6 @@ export default function PetsListPage() {
     cats: pets.filter(pet => pet.species.toLowerCase().includes('gato') || pet.species.toLowerCase().includes('cat')).length,
     consultationsToday: 5 // Mock data - would come from a separate API
   };
-
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -267,7 +229,6 @@ export default function PetsListPage() {
           </Link>
         </Button>
       </div>
-
       {/* Filters */}
       <div className="flex items-center space-x-4">
         <div className="flex-1 max-w-md">
@@ -283,7 +244,6 @@ export default function PetsListPage() {
           Filtros
         </Button>
       </div>
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -299,7 +259,6 @@ export default function PetsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -315,7 +274,6 @@ export default function PetsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -331,7 +289,6 @@ export default function PetsListPage() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -344,7 +301,6 @@ export default function PetsListPage() {
           </CardContent>
         </Card>
       </div>
-
       {/* Error State */}
       {error && (
         <div className="text-center py-12">
@@ -360,7 +316,6 @@ export default function PetsListPage() {
           </Button>
         </div>
       )}
-
       {/* Loading State */}
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -389,23 +344,18 @@ export default function PetsListPage() {
           ))}
         </div>
       )}
-
       {/* Pets Grid */}
       {!loading && !error && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pets.map((pet, index) => (
-              <motion.div
+              <div
                 key={pet.pet_id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
               >
                 <PetCard pet={pet} onDelete={handleDeletePet} />
-              </motion.div>
+              </div>
             ))}
           </div>
-          
           {pagination.pages > 1 && (
             <div className="flex items-center justify-between mt-8">
               <div className="text-sm text-text-secondary">
@@ -421,11 +371,9 @@ export default function PetsListPage() {
                   <ChevronLeft className="w-4 h-4" />
                   Anterior
                 </Button>
-                
                 {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
                   const page = i + Math.max(1, currentPage - 2);
                   if (page > pagination.pages) return null;
-                  
                   return (
                     <Button
                       key={page}
@@ -438,7 +386,6 @@ export default function PetsListPage() {
                     </Button>
                   );
                 })}
-                
                 <Button
                   variant="secondary"
                   size="sm"
@@ -453,7 +400,6 @@ export default function PetsListPage() {
           )}
         </>
       )}
-
       {/* Empty State */}
       {!loading && !error && pets.length === 0 && (
         <div className="text-center py-12">
