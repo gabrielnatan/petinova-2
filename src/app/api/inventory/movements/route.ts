@@ -3,26 +3,21 @@ import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
 import { z } from 'zod'
 
-// Simplified schema to work with InventoryItem model
-const inventoryUpdateSchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório'),
-  description: z.string().optional(),
-  quantity: z.number().min(0, 'Quantidade não pode ser negativa'),
-  price: z.number().positive('Preço deve ser positivo').optional(),
-  supplier: z.string().optional(),
-  expiryDate: z.string().optional().transform(str => str ? new Date(str) : undefined)
-})
-
-// Mock movement schema for compatibility (movements are not implemented in DB yet)
-const mockMovementSchema = z.object({
+const movementCreateSchema = z.object({
   itemId: z.string().min(1, 'Item é obrigatório'),
-  type: z.enum(['IN', 'OUT', 'ADJUSTMENT']),
-  quantity: z.number().positive('Quantidade deve ser positiva'),
-  reason: z.string().min(1, 'Motivo é obrigatório'),
-  notes: z.string().optional()
+  type: z.enum(['IN', 'OUT', 'ADJUSTMENT', 'TRANSFER', 'RETURN', 'LOSS']),
+  quantity: z.number().int().positive('Quantidade deve ser positiva'),
+  reason: z.string().optional(),
+  reference: z.string().optional(),
+  referenceType: z.enum(['PURCHASE', 'SALE', 'PRESCRIPTION', 'TRANSFER', 'ADJUSTMENT', 'RETURN', 'LOSS']).optional(),
+  unitCost: z.number().positive().optional(),
+  supplier: z.string().optional(),
+  invoiceNumber: z.string().optional(),
+  batchNumber: z.string().optional(),
+  expirationDate: z.string().transform((str) => str ? new Date(str) : undefined).optional()
 })
 
-// GET /api/inventory/movements - List inventory items (movements not implemented yet)
+// GET /api/inventory/movements - Listar movimentações
 export async function GET(request: NextRequest) {
   try {
     const user = getUserFromRequest(request)
@@ -34,77 +29,92 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '10')
     const search = searchParams.get('search') || ''
-    
+    const itemId = searchParams.get('itemId')
+    const type = searchParams.get('type')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+
     const skip = (page - 1) * limit
 
-    // Search inventory items instead of movements
-    const where: any = {
+    const where = {
+      clinicId: user.clinicId,
+      ...(itemId && { itemId }),
+      ...(type && { type }),
+      ...(startDate && endDate && {
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(endDate)
+        }
+      }),
       ...(search && {
         OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { description: { contains: search, mode: 'insensitive' as const } },
-          { supplier: { contains: search, mode: 'insensitive' as const } }
+          { reason: { contains: search, mode: 'insensitive' as const } },
+          { reference: { contains: search, mode: 'insensitive' as const } },
+          { supplier: { contains: search, mode: 'insensitive' as const } },
+          { item: { name: { contains: search, mode: 'insensitive' as const } } }
         ]
       })
     }
 
-    const [items, total] = await Promise.all([
-      prisma.inventoryItem.findMany({
+    const [movements, total] = await Promise.all([
+      prisma.inventoryMovement.findMany({
         where,
+        include: {
+          item: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              category: true
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              role: true
+            }
+          }
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' }
       }),
-      prisma.inventoryItem.count({ where })
+      prisma.inventoryMovement.count({ where })
     ])
 
-    // Mock movements data for compatibility - in a real app these would be separate records
     return NextResponse.json({
-      movements: items.map(item => ({
-        movement_id: item.id,
-        product: {
-          id: item.id,
-          name: item.name,
-          sku: item.id.substring(0, 8).toUpperCase(),
-          unit: 'un',
-          category: 'General'
-        },
-        type: 'ADJUSTMENT' as const,
-        quantity: item.quantity,
-        reason: 'Stock adjustment',
-        notes: item.description,
-        reference: null,
-        referenceType: null,
-        unitCost: item.price,
-        totalCost: item.price ? item.price * item.quantity : null,
-        supplier: item.supplier,
-        invoiceNumber: null,
-        batchNumber: null,
-        expirationDate: item.expiryDate,
-        user: {
-          id: 'system',
-          name: 'System'
-        },
-        created_at: item.createdAt
+      movements: movements.map(movement => ({
+        movement_id: movement.id,
+        itemId: movement.itemId,
+        type: movement.type,
+        quantity: movement.quantity,
+        reason: movement.reason,
+        reference: movement.reference,
+        referenceType: movement.referenceType,
+        unitCost: movement.unitCost,
+        totalCost: movement.totalCost,
+        supplier: movement.supplier,
+        invoiceNumber: movement.invoiceNumber,
+        batchNumber: movement.batchNumber,
+        expirationDate: movement.expirationDate,
+        userId: movement.userId,
+        clinicId: movement.clinicId,
+        item: movement.item,
+        user: movement.user,
+        created_at: movement.createdAt,
+        updated_at: movement.updatedAt
       })),
       pagination: {
         page,
         limit,
         total,
         pages: Math.ceil(total / limit)
-      },
-      stats: {
-        summary: {
-          adjustment: {
-            count: total,
-            quantity: items.reduce((sum, item) => sum + item.quantity, 0)
-          }
-        }
       }
     })
 
   } catch (error) {
-    console.error('Erro ao buscar itens de estoque:', error)
+    console.error('Erro ao buscar movimentações:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
@@ -112,7 +122,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/inventory/movements - Create or update inventory item (simplified)
+// POST /api/inventory/movements - Criar nova movimentação
 export async function POST(request: NextRequest) {
   try {
     const user = getUserFromRequest(request)
@@ -120,138 +130,121 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    // Check permissions
-    const currentUser = await prisma.user.findUnique({
-      where: { id: user.userId },
-      select: { role: true }
+    const body = await request.json()
+    const validatedData = movementCreateSchema.parse(body)
+
+    // Verificar se o item existe
+    const item = await prisma.inventoryItem.findUnique({
+      where: {
+        id: validatedData.itemId,
+        clinicId: user.clinicId
+      }
     })
 
-    if (!currentUser || currentUser.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Sem permissão para gerenciar estoque' }, { status: 403 })
+    if (!item) {
+      return NextResponse.json(
+        { error: 'Item não encontrado' },
+        { status: 404 }
+      )
     }
 
-    const body = await request.json()
-    
-    // Check if this is a mock movement request or inventory item creation
-    if (body.itemId) {
-      // Mock movement handling for compatibility
-      const validatedData = mockMovementSchema.parse(body)
-      
-      const item = await prisma.inventoryItem.findUnique({
-        where: { id: validatedData.itemId }
-      })
+    // Calcular custo total
+    const totalCost = validatedData.unitCost ? validatedData.unitCost * validatedData.quantity : null
 
-      if (!item) {
-        return NextResponse.json(
-          { error: 'Item não encontrado' },
-          { status: 404 }
-        )
-      }
+    // Verificar se há estoque suficiente para saída
+    if (validatedData.type === 'OUT' && item.quantity < validatedData.quantity) {
+      return NextResponse.json(
+        { error: 'Estoque insuficiente para esta movimentação' },
+        { status: 400 }
+      )
+    }
 
-      // Calculate new quantity based on movement type
-      let newQuantity = item.quantity
-      switch (validatedData.type) {
-        case 'IN':
-          newQuantity += validatedData.quantity
-          break
-        case 'OUT':
-          if (item.quantity < validatedData.quantity) {
-            return NextResponse.json(
-              { error: 'Estoque insuficiente para esta movimentação' },
-              { status: 400 }
-            )
+    // Criar movimentação
+    const movement = await prisma.inventoryMovement.create({
+      data: {
+        itemId: validatedData.itemId,
+        type: validatedData.type,
+        quantity: validatedData.quantity,
+        reason: validatedData.reason,
+        reference: validatedData.reference,
+        referenceType: validatedData.referenceType,
+        unitCost: validatedData.unitCost,
+        totalCost,
+        supplier: validatedData.supplier,
+        invoiceNumber: validatedData.invoiceNumber,
+        batchNumber: validatedData.batchNumber,
+        expirationDate: validatedData.expirationDate,
+        userId: user.id,
+        clinicId: user.clinicId
+      },
+      include: {
+        item: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            category: true
           }
-          newQuantity -= validatedData.quantity
-          break
-        case 'ADJUSTMENT':
-          newQuantity = validatedData.quantity
-          break
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            role: true
+          }
+        }
       }
+    })
 
-      // Update inventory item quantity
-      const updatedItem = await prisma.inventoryItem.update({
-        where: { id: validatedData.itemId },
-        data: { quantity: newQuantity }
-      })
-
-      return NextResponse.json({
-        message: 'Movimentação registrada com sucesso',
-        movement: {
-          movement_id: updatedItem.id,
-          product: {
-            id: updatedItem.id,
-            name: updatedItem.name,
-            sku: updatedItem.id.substring(0, 8).toUpperCase(),
-            unit: 'un',
-            category: 'General'
-          },
-          type: validatedData.type,
-          quantity: validatedData.quantity,
-          reason: validatedData.reason,
-          notes: validatedData.notes,
-          reference: null,
-          referenceType: null,
-          unitCost: updatedItem.price,
-          totalCost: updatedItem.price ? updatedItem.price * validatedData.quantity : null,
-          supplier: updatedItem.supplier,
-          invoiceNumber: null,
-          batchNumber: null,
-          expirationDate: updatedItem.expiryDate,
-          user: {
-            id: user.userId,
-            name: 'Current User'
-          },
-          newStock: newQuantity,
-          created_at: new Date().toISOString()
-        }
-      }, { status: 201 })
-    } else {
-      // Create new inventory item
-      const validatedData = inventoryUpdateSchema.parse(body)
-
-      const newItem = await prisma.inventoryItem.create({
-        data: {
-          name: validatedData.name,
-          description: validatedData.description,
-          quantity: validatedData.quantity,
-          price: validatedData.price,
-          supplier: validatedData.supplier,
-          expiryDate: validatedData.expiryDate
-        }
-      })
-
-      return NextResponse.json({
-        message: 'Item criado com sucesso',
-        movement: {
-          movement_id: newItem.id,
-          product: {
-            id: newItem.id,
-            name: newItem.name,
-            sku: newItem.id.substring(0, 8).toUpperCase(),
-            unit: 'un',
-            category: 'General'
-          },
-          type: 'IN' as const,
-          quantity: newItem.quantity,
-          reason: 'Novo item adicionado',
-          notes: newItem.description,
-          reference: null,
-          referenceType: null,
-          unitCost: newItem.price,
-          totalCost: newItem.price ? newItem.price * newItem.quantity : null,
-          supplier: newItem.supplier,
-          invoiceNumber: null,
-          batchNumber: null,
-          expirationDate: newItem.expiryDate,
-          user: {
-            id: user.userId,
-            name: 'Current User'
-          },
-          newStock: newItem.quantity,
-          created_at: newItem.createdAt
-        }
-      }, { status: 201 })
+    // Atualizar quantidade do item
+    let newQuantity = item.quantity
+    switch (validatedData.type) {
+      case 'IN':
+      case 'RETURN':
+        newQuantity += validatedData.quantity
+        break
+      case 'OUT':
+      case 'LOSS':
+        newQuantity -= validatedData.quantity
+        break
+      case 'ADJUSTMENT':
+        newQuantity = validatedData.quantity // Ajuste define a quantidade
+        break
+      case 'TRANSFER':
+        // Para transferências, a quantidade pode ser positiva ou negativa
+        newQuantity += validatedData.quantity
+        break
     }
+
+    await prisma.inventoryItem.update({
+      where: { id: validatedData.itemId },
+      data: { quantity: newQuantity }
+    })
+
+    return NextResponse.json({
+      message: 'Movimentação criada com sucesso',
+      movement: {
+        movement_id: movement.id,
+        itemId: movement.itemId,
+        type: movement.type,
+        quantity: movement.quantity,
+        reason: movement.reason,
+        reference: movement.reference,
+        referenceType: movement.referenceType,
+        unitCost: movement.unitCost,
+        totalCost: movement.totalCost,
+        supplier: movement.supplier,
+        invoiceNumber: movement.invoiceNumber,
+        batchNumber: movement.batchNumber,
+        expirationDate: movement.expirationDate,
+        userId: movement.userId,
+        clinicId: movement.clinicId,
+        item: movement.item,
+        user: movement.user,
+        created_at: movement.createdAt,
+        updated_at: movement.updatedAt
+      }
+    }, { status: 201 })
 
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -261,7 +254,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.error('Erro ao processar movimentação:', error)
+    console.error('Erro ao criar movimentação:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

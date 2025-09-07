@@ -1,3 +1,5 @@
+import { apiClient } from './client';
+
 interface Guardian {
   guardian_id: string;
   fullName: string;
@@ -52,72 +54,24 @@ class GuardianAPI {
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.search) searchParams.append('search', params.search);
 
-    const response = await fetch(`${this.baseURL}?${searchParams.toString()}`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao buscar tutores');
-    }
-
-    return response.json();
+    const url = `${this.baseURL}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+    return apiClient.get<GuardianListResponse>(url);
   }
 
   async getGuardian(id: string): Promise<GuardianResponse> {
-    const response = await fetch(`${this.baseURL}/${id}`);
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao buscar tutor');
-    }
-
-    return response.json();
+    return apiClient.get<GuardianResponse>(`${this.baseURL}/${id}`);
   }
 
   async createGuardian(data: CreateGuardianData): Promise<GuardianResponse> {
-    const response = await fetch(this.baseURL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao criar tutor');
-    }
-
-    return response.json();
+    return apiClient.post<GuardianResponse>(this.baseURL, data);
   }
 
   async updateGuardian(id: string, data: UpdateGuardianData): Promise<GuardianResponse> {
-    const response = await fetch(`${this.baseURL}/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao atualizar tutor');
-    }
-
-    return response.json();
+    return apiClient.put<GuardianResponse>(`${this.baseURL}/${id}`, data);
   }
 
   async deleteGuardian(id: string): Promise<{ message: string }> {
-    const response = await fetch(`${this.baseURL}/${id}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Erro ao excluir tutor');
-    }
-
-    return response.json();
+    return apiClient.delete<{ message: string }>(`${this.baseURL}/${id}`);
   }
 
   // Método utilitário para busca simples (usado em dropdowns)

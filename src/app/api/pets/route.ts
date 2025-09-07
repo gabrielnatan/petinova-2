@@ -64,6 +64,10 @@ export async function GET(request: NextRequest) {
       }),
       prisma.pet.count({ where })
     ])
+    
+    console.log("Pets encontrados:", pets.length);
+    console.log("Total de pets:", total);
+    console.log("Pets:", JSON.stringify(pets, null, 2));
 
     return NextResponse.json({
       pets: pets.map(pet => ({

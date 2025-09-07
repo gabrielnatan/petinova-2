@@ -1,10 +1,17 @@
 interface Consultation {
   consultation_id: string;
+  appointment: {
+    appointment_id: string;
+    dateTime: string;
+    status: string;
+  };
   pet: {
     id: string;
     name: string;
     species: string;
     breed?: string;
+    weight?: number;
+    birthDate?: string;
     avatarUrl?: string;
   };
   veterinarian: {

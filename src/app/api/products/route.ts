@@ -9,7 +9,13 @@ const inventoryItemCreateSchema = z.object({
   quantity: z.number().min(0, 'Quantidade não pode ser negativa'),
   price: z.number().positive('Preço deve ser positivo').optional(),
   supplier: z.string().optional(),
-  expiryDate: z.string().optional().transform(str => str ? new Date(str) : undefined)
+  expiryDate: z.string().optional().transform(str => str ? new Date(str) : undefined),
+  minimumStock: z.number().min(0).default(0),
+  location: z.string().optional(),
+  sku: z.string().optional(),
+  barcode: z.string().optional(),
+  category: z.string().optional(),
+  brand: z.string().optional()
 })
 
 // GET /api/products - List inventory items (simplified for compatibility)
@@ -29,18 +35,23 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     const where: any = {
+      clinicId: user.clinicId,
       ...(search && {
         OR: [
           { name: { contains: search, mode: 'insensitive' as const } },
           { description: { contains: search, mode: 'insensitive' as const } },
-          { supplier: { contains: search, mode: 'insensitive' as const } }
+          { supplier: { contains: search, mode: 'insensitive' as const } },
+          { sku: { contains: search, mode: 'insensitive' as const } },
+          { barcode: { contains: search, mode: 'insensitive' as const } },
+          { category: { contains: search, mode: 'insensitive' as const } },
+          { brand: { contains: search, mode: 'insensitive' as const } }
         ]
       })
     }
 
     if (lowStock) {
       where.quantity = {
-        lte: 5 // Mock low stock threshold
+        lte: where.minimumStock || 5
       }
     }
 
@@ -60,11 +71,11 @@ export async function GET(request: NextRequest) {
         product_id: item.id,
         name: item.name,
         description: item.description,
-        sku: item.id.substring(0, 8).toUpperCase(),
-        barcode: null,
-        category: 'General',
+        sku: item.sku || item.id.substring(0, 8).toUpperCase(),
+        barcode: item.barcode,
+        category: item.category || 'General',
         subcategory: null,
-        brand: null,
+        brand: item.brand,
         supplier: item.supplier,
         prices: {
           purchase: item.price || 0,
@@ -73,9 +84,9 @@ export async function GET(request: NextRequest) {
         },
         inventory: {
           stock: item.quantity,
-          minimumStock: 5,
+          minimumStock: item.minimumStock,
           unit: 'un',
-          location: null
+          location: item.location
         },
         details: {
           expirationDate: item.expiryDate,
@@ -87,10 +98,10 @@ export async function GET(request: NextRequest) {
         stats: {
           totalSales: 0,
           totalPurchases: 0,
-          isLowStock: item.quantity <= 5
+          isLowStock: item.quantity <= item.minimumStock
         },
         isActive: true,
-        clinic_id: 'default',
+        clinic_id: item.clinicId,
         created_at: item.createdAt,
         updated_at: item.updatedAt
       })),
@@ -125,7 +136,8 @@ export async function POST(request: NextRequest) {
     // Check if item with same name already exists
     const existingByName = await prisma.inventoryItem.findFirst({
       where: {
-        name: validatedData.name
+        name: validatedData.name,
+        clinicId: user.clinicId
       }
     })
 
@@ -136,6 +148,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if SKU already exists
+    if (validatedData.sku) {
+      const existingBySku = await prisma.inventoryItem.findFirst({
+        where: {
+          sku: validatedData.sku,
+          clinicId: user.clinicId
+        }
+      })
+
+      if (existingBySku) {
+        return NextResponse.json(
+          { error: 'Já existe um item com este SKU' },
+          { status: 400 }
+        )
+      }
+    }
+
     const item = await prisma.inventoryItem.create({
       data: {
         name: validatedData.name,
@@ -143,7 +172,14 @@ export async function POST(request: NextRequest) {
         quantity: validatedData.quantity,
         price: validatedData.price,
         supplier: validatedData.supplier,
-        expiryDate: validatedData.expiryDate
+        expiryDate: validatedData.expiryDate,
+        minimumStock: validatedData.minimumStock,
+        location: validatedData.location,
+        sku: validatedData.sku,
+        barcode: validatedData.barcode,
+        category: validatedData.category,
+        brand: validatedData.brand,
+        clinicId: user.clinicId
       }
     })
 
@@ -153,11 +189,11 @@ export async function POST(request: NextRequest) {
         product_id: item.id,
         name: item.name,
         description: item.description,
-        sku: item.id.substring(0, 8).toUpperCase(),
-        barcode: null,
-        category: 'General',
+        sku: item.sku || item.id.substring(0, 8).toUpperCase(),
+        barcode: item.barcode,
+        category: item.category || 'General',
         subcategory: null,
-        brand: null,
+        brand: item.brand,
         supplier: item.supplier,
         prices: {
           purchase: item.price || 0,
@@ -166,9 +202,9 @@ export async function POST(request: NextRequest) {
         },
         inventory: {
           stock: item.quantity,
-          minimumStock: 5,
+          minimumStock: item.minimumStock,
           unit: 'un',
-          location: null
+          location: item.location
         },
         details: {
           expirationDate: item.expiryDate,
@@ -180,10 +216,10 @@ export async function POST(request: NextRequest) {
         stats: {
           totalSales: 0,
           totalPurchases: 0,
-          isLowStock: item.quantity <= 5
+          isLowStock: item.quantity <= item.minimumStock
         },
         isActive: true,
-        clinic_id: 'default',
+        clinic_id: item.clinicId,
         created_at: item.createdAt,
         updated_at: item.updatedAt
       }

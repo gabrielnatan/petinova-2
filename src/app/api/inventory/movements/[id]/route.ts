@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromRequest } from '@/lib/auth'
 
-// GET /api/inventory/movements/[id] - Get inventory item details (movements not implemented)
+// GET /api/inventory/movements/[id] - Obter movimentação específica
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,51 +14,61 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const item = await prisma.inventoryItem.findUnique({
+    const movement = await prisma.inventoryMovement.findUnique({
       where: {
-        id: resolvedParams.id
+        id: resolvedParams.id,
+        clinicId: user.clinicId
+      },
+      include: {
+        item: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            category: true,
+            quantity: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            name: true,
+            role: true
+          }
+        }
       }
     })
 
-    if (!item) {
-      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
+    if (!movement) {
+      return NextResponse.json({ error: 'Movimentação não encontrada' }, { status: 404 })
     }
 
-    // Mock movement data for compatibility
     return NextResponse.json({
       movement: {
-        movement_id: item.id,
-        product: {
-          id: item.id,
-          name: item.name,
-          sku: item.id.substring(0, 8).toUpperCase(),
-          unit: 'un',
-          category: 'General',
-          stock: item.quantity
-        },
-        type: 'ADJUSTMENT' as const,
-        quantity: item.quantity,
-        reason: 'Stock adjustment',
-        notes: item.description,
-        reference: null,
-        referenceType: null,
-        unitCost: item.price,
-        totalCost: item.price ? item.price * item.quantity : null,
-        supplier: item.supplier,
-        invoiceNumber: null,
-        batchNumber: null,
-        expirationDate: item.expiryDate,
-        user: {
-          id: 'system',
-          name: 'System',
-          role: 'ADMIN'
-        },
-        created_at: item.createdAt
+        movement_id: movement.id,
+        itemId: movement.itemId,
+        type: movement.type,
+        quantity: movement.quantity,
+        reason: movement.reason,
+        reference: movement.reference,
+        referenceType: movement.referenceType,
+        unitCost: movement.unitCost,
+        totalCost: movement.totalCost,
+        supplier: movement.supplier,
+        invoiceNumber: movement.invoiceNumber,
+        batchNumber: movement.batchNumber,
+        expirationDate: movement.expirationDate,
+        userId: movement.userId,
+        clinicId: movement.clinicId,
+        item: movement.item,
+        user: movement.user,
+        created_at: movement.createdAt,
+        updated_at: movement.updatedAt
       }
     })
 
   } catch (error) {
-    console.error('Erro ao buscar item:', error)
+    console.error('Erro ao buscar movimentação:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }
@@ -66,7 +76,7 @@ export async function GET(
   }
 }
 
-// DELETE /api/inventory/movements/[id] - Delete inventory item (simplified)
+// DELETE /api/inventory/movements/[id] - Deletar movimentação
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -77,41 +87,73 @@ export async function DELETE(
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
     }
 
-    // Check permissions (only ADMIN can delete items)
-    const currentUser = await prisma.user.findUnique({
-      where: { id: user.userId },
-      select: { role: true }
-    })
-
-    if (currentUser?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Sem permissão para excluir itens' }, { status: 403 })
-    }
-
     const resolvedParams = await params
-    
-    // Find inventory item
-    const item = await prisma.inventoryItem.findUnique({
+
+    // Verificar se a movimentação existe
+    const movement = await prisma.inventoryMovement.findUnique({
       where: {
-        id: resolvedParams.id
+        id: resolvedParams.id,
+        clinicId: user.clinicId
+      },
+      include: {
+        item: true
       }
     })
 
-    if (!item) {
-      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 })
+    if (!movement) {
+      return NextResponse.json({ error: 'Movimentação não encontrada' }, { status: 404 })
     }
 
-    // Delete the inventory item
-    await prisma.inventoryItem.delete({
+    // Verificar permissões (apenas ADMIN pode deletar)
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true }
+    })
+
+    if (!currentUser || currentUser.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Sem permissão para deletar movimentações' },
+        { status: 403 }
+      )
+    }
+
+    // Reverter a movimentação no estoque
+    let newQuantity = movement.item.quantity
+    switch (movement.type) {
+      case 'IN':
+      case 'RETURN':
+        newQuantity -= movement.quantity
+        break
+      case 'OUT':
+      case 'LOSS':
+        newQuantity += movement.quantity
+        break
+      case 'ADJUSTMENT':
+        // Para ajustes, não podemos reverter automaticamente
+        // Seria necessário saber o valor anterior
+        break
+      case 'TRANSFER':
+        newQuantity -= movement.quantity
+        break
+    }
+
+    // Atualizar quantidade do item
+    await prisma.inventoryItem.update({
+      where: { id: movement.itemId },
+      data: { quantity: newQuantity }
+    })
+
+    // Deletar a movimentação
+    await prisma.inventoryMovement.delete({
       where: { id: resolvedParams.id }
     })
 
     return NextResponse.json({
-      message: 'Item excluído com sucesso',
-      revertedStock: 0
+      message: 'Movimentação deletada com sucesso'
     })
 
   } catch (error) {
-    console.error('Erro ao excluir item:', error)
+    console.error('Erro ao deletar movimentação:', error)
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 }

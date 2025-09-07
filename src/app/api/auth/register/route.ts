@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { PasswordService } from '@/lib/password'
 import { z } from 'zod'
 import { generateAccessToken, createRefreshToken } from '@/lib/jwt'
 
@@ -47,7 +47,16 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const hashedPassword = await bcrypt.hash(validatedData.password, 12)
+    // Validar força da senha
+    const passwordValidation = PasswordService.validatePasswordStrength(validatedData.password)
+    if (!passwordValidation.valid) {
+      return NextResponse.json(
+        { error: 'Senha não atende aos requisitos de segurança', details: passwordValidation.errors },
+        { status: 400 }
+      )
+    }
+    
+    const hashedPassword = await PasswordService.hashPassword(validatedData.password)
     
     const result = await prisma.$transaction(async (tx) => {
       const clinic = await tx.clinic.create({

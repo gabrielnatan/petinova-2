@@ -37,7 +37,15 @@ export async function GET(
             breed: true,
             avatarUrl: true,
             birthDate: true,
-            weight: true
+            weight: true,
+            guardian: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true
+              }
+            }
           }
         },
         veterinarian: {
@@ -79,6 +87,12 @@ export async function GET(
         consultation_id: consultation.id,
         pet: consultation.pet,
         veterinarian: consultation.veterinarian,
+        guardian: {
+          id: consultation.pet.guardian?.id,
+          name: consultation.pet.guardian?.name,
+          email: consultation.pet.guardian?.email,
+          phone: consultation.pet.guardian?.phone
+        },
         diagnosis: consultation.diagnosis,
         treatment: consultation.treatment,
         notes: consultation.notes,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { revokeRefreshToken, revokeAllUserRefreshTokens } from '@/lib/jwt'
 import { verifyAccessToken } from '@/lib/jwt'
+import { AuditLogger } from '@/lib/audit-log'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +18,9 @@ export async function POST(request: NextRequest) {
       const payload = verifyAccessToken(accessToken)
       if (payload) {
         await revokeAllUserRefreshTokens(payload.userId)
+        
+        // Log de auditoria
+        await AuditLogger.logLogout(payload.userId, payload.email, request.ip, request.headers.get('user-agent'))
       }
     }
     

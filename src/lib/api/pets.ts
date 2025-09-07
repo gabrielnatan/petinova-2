@@ -21,6 +21,27 @@ interface Pet {
     email: string;
     phone?: string;
   };
+  consultations?: Array<{
+    id: string;
+    date: string;
+    diagnosis: string;
+    treatment: string;
+    notes: string;
+    veterinarian: {
+      id: string;
+      name: string;
+    };
+  }>;
+  appointments?: Array<{
+    id: string;
+    date: string;
+    status: string;
+    notes: string;
+    veterinarian: {
+      id: string;
+      name: string;
+    };
+  }>;
   created_at: string;
   updated_at: string;
 }
@@ -77,11 +98,25 @@ class PetAPI {
   }
 
   async createPet(data: CreatePetData): Promise<PetResponse> {
-    return apiClient.post<PetResponse>(this.baseURL, data);
+    // Mapear guardian_id para guardianId para compatibilidade com a API
+    const apiData = {
+      ...data,
+      guardianId: data.guardian_id
+    };
+    delete (apiData as any).guardian_id;
+    
+    return apiClient.post<PetResponse>(this.baseURL, apiData);
   }
 
   async updatePet(id: string, data: UpdatePetData): Promise<PetResponse> {
-    return apiClient.put<PetResponse>(`${this.baseURL}/${id}`, data);
+    // Mapear guardian_id para guardianId para compatibilidade com a API se presente
+    const apiData = { ...data };
+    if ((data as any).guardian_id) {
+      (apiData as any).guardianId = (data as any).guardian_id;
+      delete (apiData as any).guardian_id;
+    }
+    
+    return apiClient.put<PetResponse>(`${this.baseURL}/${id}`, apiData);
   }
 
   async deletePet(id: string): Promise<{ message: string }> {

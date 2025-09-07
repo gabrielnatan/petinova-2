@@ -3,6 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { PasswordService } from '@/lib/password'
 import { z } from 'zod'
 import { generateAccessToken, createRefreshToken } from '@/lib/jwt'
+import { AuditLogger } from '@/lib/audit-log'
+
+// Rate limiting simples em memória (em produção, usar Redis)
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>()
+const MAX_ATTEMPTS = 5
+const LOCKOUT_TIME = 15 * 60 * 1000 // 15 minutos
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -15,6 +21,24 @@ export async function POST(request: NextRequest) {
     
     const validatedData = loginSchema.parse(body)
     
+    // Rate limiting
+    const clientIP = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
+    const now = Date.now()
+    const attempts = loginAttempts.get(clientIP)
+    
+    if (attempts && attempts.count >= MAX_ATTEMPTS) {
+      const timeSinceLastAttempt = now - attempts.lastAttempt
+      if (timeSinceLastAttempt < LOCKOUT_TIME) {
+        return NextResponse.json(
+          { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+          { status: 429 }
+        )
+      } else {
+        // Reset attempts after lockout period
+        loginAttempts.delete(clientIP)
+      }
+    }
+    
     const user = await prisma.user.findUnique({
       where: { email: validatedData.email },
       include: {
@@ -23,6 +47,16 @@ export async function POST(request: NextRequest) {
     })
     
     if (!user || !user.active) {
+      // Registrar tentativa falhada
+      const currentAttempts = loginAttempts.get(clientIP) || { count: 0, lastAttempt: 0 }
+      loginAttempts.set(clientIP, { 
+        count: currentAttempts.count + 1, 
+        lastAttempt: now 
+      })
+      
+      // Log de auditoria
+      await AuditLogger.logLoginFailed(validatedData.email, 'Usuário inativo', clientIP, request.headers.get('user-agent'))
+      
       return NextResponse.json(
         { error: 'Credenciais inválidas' },
         { status: 401 }
@@ -32,11 +66,27 @@ export async function POST(request: NextRequest) {
     const passwordMatch = await PasswordService.comparePassword(validatedData.password, user.password)
     
     if (!passwordMatch) {
+      // Registrar tentativa falhada
+      const currentAttempts = loginAttempts.get(clientIP) || { count: 0, lastAttempt: 0 }
+      loginAttempts.set(clientIP, { 
+        count: currentAttempts.count + 1, 
+        lastAttempt: now 
+      })
+      
+      // Log de auditoria
+      await AuditLogger.logLoginFailed(validatedData.email, 'Senha incorreta', clientIP, request.headers.get('user-agent'))
+      
       return NextResponse.json(
         { error: 'Credenciais inválidas' },
         { status: 401 }
       )
     }
+    
+    // Login bem-sucedido - limpar tentativas
+    loginAttempts.delete(clientIP)
+    
+    // Log de auditoria de sucesso
+    await AuditLogger.logLoginSuccess(user.id, user.email, clientIP, request.headers.get('user-agent'))
     
     const accessToken = generateAccessToken({
       userId: user.id,

@@ -7,18 +7,28 @@ interface Pet {
 }
 
 interface Guardian {
-  id: string;
-  name: string;
+  guardian_id: string;
+  fullName: string;
   email: string;
   phone: string;
   address?: any;
 }
 
 interface Veterinarian {
-  id: string;
-  name: string;
-  specialty?: string;
-  crmv?: string;
+  veterinarian_id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  clinic_id: string;
+  stats?: {
+    totalAppointments?: number;
+    totalConsultations?: number;
+    todayAppointments?: number;
+    thisMonthConsultations?: number;
+  };
+  created_at: string;
+  updated_at: string;
 }
 
 interface Appointment {

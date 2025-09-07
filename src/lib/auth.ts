@@ -21,3 +21,8 @@ export function getUserFromRequest(request: NextRequest): JWTPayload | null {
 }
 
 export { verifyAccessToken as verifyToken }
+
+export async function verifyAuth(request: NextRequest): Promise<string | null> {
+  const user = getUserFromRequest(request)
+  return user?.userId || null
+}
